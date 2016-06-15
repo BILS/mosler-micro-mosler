@@ -1,0 +1,11 @@
+# -*-sh-*-
+
+echo "Installing Thinlinc packages"
+yum -y install {{ env['VAULT'] }}/*x86_64.rpm {{ env['VAULT'] }}/*noarch.rpm xauth
+
+echo "Setting up Thinlinc"
+/opt/thinlinc/sbin/tl-setup -a {{ env['VAULT'] }}/tl_answers
+
+echo "Configuring Thinlinc web access"
+sed -i 's/^listen=.*$/listen=443/' /opt/thinlinc/etc/conf.d/webaccess.hconf
+

@@ -1,0 +1,61 @@
+# -*-sh-*-
+
+#############################################################
+{% include 'openstack-common.jn2' %}
+
+#############################################################
+
+echo "Openstack Components"
+yum -y install openstack-neutron openstack-neutron-ml2 openstack-neutron-openvswitch
+
+echo "System config"
+## RegExp, Replacement
+{% set lines = [
+	('^\s*net.ipv4.ip_forward\s*=.*$',                 'net.ipv4.ip_forward=1'                 ),
+	('^\s*net.ipv4.conf.all.rp_filter\s*=.*$',         'net.ipv4.conf.all.rp_filter=0'         ),
+	('^\s*net.ipv4.conf.default.rp_filter\s*=.*$',     'net.ipv4.conf.default.rp_filter=0'     ),
+	('^\s*net.bridge.bridge-nf-call-arptables\s*=.*$', 'net.bridge.bridge-nf-call-arptables=1' ),
+	('^\s*net.bridge.bridge-nf-call-iptables\s*=.*$',  'net.bridge.bridge-nf-call-iptables=1'  ),
+	('^\s*net.bridge.bridge-nf-call-ip6tables\s*=.*$', 'net.bridge.bridge-nf-call-ip6tables=1' )
+] -%}
+{% for regexp, lines in lines %}
+sed -i -e 's/{{ regexp }}/{{ line }}/' /etc/sysctl.conf
+{% endfor %}
+
+echo "Starting OpenVSwitch"
+service openvswitch start
+chkconfig openvswitch on
+    
+echo "Creating the OVS bridge"
+ovs-vsctl add-br br-eth1 || true
+
+echo "Adding eth1 to the OVS bridge"
+ovs-vsctl add-port br-eth1 eth1 || true
+
+#############################################################
+echo "Copying config files"
+rsync -a {{ env['VAULT'] }}/neutron.conf           /etc/neutron/neutron.conf
+rsync -a {{ env['VAULT'] }}/ml2.ini                /etc/neutron/plugins/ml2/ml2.ini
+rsync -a {{ env['VAULT'] }}/ovs_neutron_plugin.ini /etc/neutron/plugins/openvswitch/ovs_neutron_plugin.ini
+
+if [ -f /etc/neutron/plugin.ini ]; then
+    rm /etc/neutron/plugin.ini
+fi
+ln -s /etc/neutron/plugins/ml2/ml2_conf.ini /etc/neutron/plugin.ini
+
+if [ ! -f /etc/init.d/neutron-openvswitch-agent.orig ]; then
+    cp /etc/init.d/neutron-openvswitch-agent /etc/init.d/neutron-openvswitch-agent.orig
+    sed -i 's,plugins/openvswitch/ovs_neutron_plugin.ini,plugin.ini,g' /etc/init.d/neutron-openvswitch-agent
+fi
+
+echo "Starting Neutron services"
+{% set services = [ 'dhcp-agent',
+		    'l3-agent',
+		    'openvswitch-agent',
+		    'metadata-agent',
+		    'ovs-cleanup'
+] -%}
+{% for service in services %}
+service neutron-{{ service }} start
+chkconfig neutron-{{ service }} on
+{% endfor %}

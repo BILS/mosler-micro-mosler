@@ -4,7 +4,7 @@
 
   public_net_id:
      type: string
-     default: d97c3bd7-d5ff-495d-80c8-2e62685b2552
+     default: __EXT_NET__
 
   private_cidr:
      type: string

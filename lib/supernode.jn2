@@ -1,0 +1,78 @@
+# -*-sh-*-
+
+#############################################################
+{% include 'openstack-common.jn2' %}
+
+yum -y install nc
+
+#############################################################
+echo "Copying config files"
+{% set files = [ 'fix_proj.sh',
+		 'import_user',
+		 'passwd_line',
+		 'queue_responder',
+		 'remove_stack.sh',
+		 'sync_exporters',
+		 'sync_grantfile',
+		 'tenant-valid',
+		 'uppmax-links.sh',
+		 'uppmax-sync.sh'
+	       ] -%}
+{% for file in files %}
+rsync -a {{ env['VAULT'] }}/{{ file }}  /usr/local/bin/{{ file }}
+{% endfor %}
+
+{% set files = [ 'project_gid',
+		 'project_ips',
+		 'project_members',
+		 'refreshimage',
+		 'setup_homedir.sh',
+		 'thinlinc_proj_setup'
+	       ] -%}
+{% for file in files %}
+rsync -a {{ env['VAULT'] }}/{{ file }}  /usr/local/sbin/{{ file }}
+chmod 0755 /usr/local/sbin/{{ file }}
+{% endfor %}
+
+{% set files = [ 'create_project.sh',
+		 'create_heat_template.sh',
+		 'create_omd_config.sh',
+		 'get_vlan.sh',
+		 'create_nfs_share.sh',
+		 'nfs_san_check.sh',
+		 'heat_add_compute.sh'
+	       ] -%}
+{% for file in files %}
+rsync -a {{ env['VAULT'] }}/{{ file }}  /usr/local/bin/{{ file }}
+chmod 0755 /usr/local/bin/{{ file }}
+{% endfor %}
+
+mkdir -p /usr/local/heat
+
+{% set files = [ 'mosler-template-resources-private_net-only',
+		 'mosler-template-resources-network',
+		 'mosler-template-resources-secgroups',
+		 'mosler-template-resources-loginnode',
+		 'mosler-template-resources-servicenode',
+		 'mosler-template-parameters'
+	       ] -%}
+{% for file in files %}
+rsync -a {{ env['VAULT'] }}/{{ file }} /usr/local/heat/{{ file }}
+chmod 0755 /usr/local/heat/{{ file }}
+{% endfor %}
+
+# Wait 300 seconds max for neutron-server to be ready
+#wait_for openstack-controller neutron-server ready 300
+wait_port openstack-controller 9696 300
+
+source /root/.keystonerc
+
+echo "Removing any 'public-net'"
+neutron net-list -F id -F name | awk '/ public-net / {print $2}' | while read netid; do neutron net-delete ${netid}; done
+
+echo 'Creating public network in neutron & updating the mosler-heat parameters'
+extnet=$(neutron net-create public-net --router:external True | awk '/ id / {print $4}')
+sed -i -e "s/__EXT_NET__/$extnet/"  /usr/local/heat/mosler-template-parameters
+
+echo "Creating public subnet network in neutron"
+neutron subnet-create public-net --name public-subnet --allocation-pool start=172.18.0.30,end=172.18.0.200 --disable-dhcp --gateway 172.18.0.1  172.18.0.0/24
