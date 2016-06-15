@@ -46,6 +46,7 @@ while [ $# -gt 0 ]; do
     shift
 done
 
+#######################################################################
 function thumb_up {
     [ -n "$1" ] && echo -ne "$1 "
     echo -e "\xF0\x9F\x91\x8D"
@@ -169,7 +170,7 @@ for i in ${!MACHINES[@]}; do
 done
 for machine in ${MACHINES[@]}; do ssh-keyscan -4 -T 1 ${FLOATING_IPs[$machine]} >> ${SSH_KNOWN_HOSTS} 2>/dev/null; done
 #Note: I silence the errors from stderr (2) to /dev/null. Don't send them to &1.
-# Not using ssh-keyscan because the exit status is 0 even when the connection failed.
+# The exit status of ssh-keyscan is 0 even when the connection failed: Using nc instead.
 
 if [ -n "$CONNECTION_FAIL" ]; then
     oups "\nFiltering out:$CONNECTION_FAIL"
@@ -177,7 +178,6 @@ else
     echo ""
     #thumb_up "\nAll connections are ready"
 fi
-
 
 ########################################################################
 # Finding a suitable port for the notification server
@@ -199,6 +199,11 @@ NOTIFICATION_PID=$!
 
 ########################################################################
 # For the parallel execution
+=======
+########################################################################
+# For the parallel execution
+########################################################################
+>>>>>>> 2c8a5d94deb0782656f6cdb82a7051bcb9d36a9d
 
 declare -A JOB_PIDS
 # function kill_bg_jobs {
@@ -221,6 +226,7 @@ trap 'cleanup' INT TERM #EXIT #HUP ERR
 ########################################################################
 # Copying files
 ########################################################################
+
 if [ "$DO_COPY" = "yes" ]; then
 
     export CONFIGS=${MM_HOME}/configs
@@ -254,7 +260,6 @@ if [ "$DO_COPY" = "yes" ]; then
     [ "$VERBOSE" = "yes" ] && echo "Copying files"
     reset_progress
     print_progress
-    declare -A RSYNC_PIDS
     for machine in ${MACHINES[@]}
     do
 	{ # scoping, in that current shell
@@ -279,7 +284,6 @@ if [ "$DO_COPY" = "yes" ]; then
 	} &
 	JOB_PIDS[$machine]=$!
     done
-    
     # Wait for all the copying to finish
     for job in ${JOB_PIDS[@]}; do wait ${job} || ((FAIL++)); print_progress; done
     print_progress # to have a clear picture
@@ -401,4 +405,104 @@ if (( FAIL > 0 )); then
 else
     [ "$VERBOSE" = "yes" ] && echo "" && thumb_up "Servers configured"
 fi
+=======
+fi
+
+#######################################################################
+# Aaaaannnnnddd...... cue music!
+########################################################################
+[ "$VERBOSE" = "yes" ] && echo -e "\nConfiguring servers:"
+reset_progress
+print_progress
+export DB_SERVER=${MACHINE_IPs[openstack-controller]} # Used in the templates
+for machine in ${MACHINES[@]}
+do
+    # Selecting the template
+     _TEMPLATE=${LIB}/${PROVISION[$machine]}.jn2
+    if [ -z "${PROVISION[$machine]}" ] || [ ! -f ${_SCRIPT} ]; then
+	oups "\tProvisioning script unknown for $machine"
+	filter_out_machine $machine
+    else
+
+	_SCRIPT=${PROVISION_TMP}/run.$machine
+	_LOG=${PROVISION_TMP}/log.$machine
+	# Common functions for notifications
+	cat > ${_SCRIPT} <<EOF
+#!/usr/bin/env bash
+
+function register {
+    curl -X POST -d \$2 ${NOTIFICATION_URL}/$machine/\$1 2>/dev/null
+}
+
+function wait_for {
+    local -r -i timeout=\${4:-30} # default: 30 seconds
+    local -i t=0 # local integer variable
+    local -i backoff=1
+
+    while (( (t++) <= timeout )) ; do
+	echo -e "Try \$t \\tTimeout: \$timeout"
+        res=\$(curl ${NOTIFICATION_URL}/\$1/\$2 2>/dev/null)
+        if [ \$? -ne 0 ] ; then echo "Unable to get status for \$2 on \$1"; break; fi
+        if [ "\$res" == "\$3" ] ; then echo "Task \$2 is \$3 on \$1 (after \$t seconds)"; return 0; fi
+        if [ "\$res" == "ERR" ] ; then echo "Task \$2 failed on \$1: Exiting..."; break; fi
+	sleep \$backoff
+        if (( (t % 10) == 0 )); then (( backoff*=2 )); fi
+        echo "backoff: \$backoff"
+    done
+    exit 1
+}
+
+# -w doesn't work on nc
+function wait_port {
+    local -r -i timeout=\${3:-30} # default: 30 seconds
+    local -i t=0 # local integer variable
+    local -i backoff=1
+    while (( (t++) <= timeout )) ; do
+	echo -e "Try \$t \\tTimeout: \$timeout"
+	nc -4 -z -v \$1 \$2 && return 0
+        res=\$(curl ${NOTIFICATION_URL}/fail/\$1 2>/dev/null)
+        if [ \$? -ne 0 ] ; then echo "Unable to get contact to \$1"; break; fi
+        if [ "\$res" == "FAIL" ] ; then echo "\$1 has already failed: Giving up here..."; break; fi
+	sleep \$backoff
+        if (( (t % 10) == 0 )); then
+	    backoff=\$(( backoff * 2 ))
+            echo "new backoff: \$backoff"
+	fi
+    done
+    exit 1
+}
+EOF
+
+	# Rendering the template
+	# It will use the (exported) environment variables
+	python -c "import os, sys, jinja2; \
+            sys.stdout.write(jinja2.Environment(loader=jinja2.FileSystemLoader(os.environ.get('LIB'))).from_string(sys.stdin.read()).render(env=os.environ))" \
+	       <${_TEMPLATE} \
+	       >> ${_SCRIPT}
+
+	{ # Scoping, in that current shell
+	    ssh -F ${SSH_CONFIG} ${FLOATING_IPs[$machine]} 'sudo bash -e -x -v 2>&1' <${_SCRIPT} &>${_LOG}
+	    RET=$?
+	    if [ $RET -eq 0 ]; then
+		report_ok $machine 
+	    else
+		report_fail $machine
+	    fi
+	    print_progress
+	    exit $RET
+	} &
+	JOB_PIDS[$machine]=$!
+    fi
+done
+    
+for job in ${JOB_PIDS[@]}; do wait $job || ((FAIL++)); done
+print_progress
+
+if (( FAIL > 0 )); then
+    oups "\a\n${FAIL} servers failed to be configured"
+else
+    [ "$VERBOSE" = "yes" ] && thumb_up "\nServers configured"
+fi
+
+>>>>>>> 2c8a5d94deb0782656f6cdb82a7051bcb9d36a9d
 kill_notifications

@@ -13,8 +13,7 @@ You first need to create a file (named 'user.rc') in order to set up your openst
 	export OS_PASSWORD=<password>
 
 This user must have the admin role for the given tenant/project. These
-settings will probably be given to you by your _openstack
-administrator_.
+settings will probably be given to you by your _openstack administrator_.
 
 The scripts define some variables (in `settings.sh`)
 * `MM_HOME` (that currently folder)
@@ -56,6 +55,7 @@ You can append the `-h` flag to see the command options.
 	export OS_USERNAME=fred
 	export OS_PASSWORD=holala
 	EOF
+
 	# The openstack user 'fred' must maybe be an admin on the tenant 'mmosler1'
 	./init.sh --all # You'll be prompted at the end for a reboot.
 	                # Rebooting will help the partition to correctly resize to the disk size
