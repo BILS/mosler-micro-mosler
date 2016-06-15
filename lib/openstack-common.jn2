@@ -1,0 +1,25 @@
+# -*-sh-*-
+
+echo "Copying Openstack repo, signing key and credentials"
+rsync {{ env['VAULT'] }}/rdo-release.repo /etc/yum.repos.d/rdo-release.repo
+rsync {{ env['VAULT'] }}/RPM-GPG-KEY-Icehouse-SIG /etc/pki/rpm-gpg/RPM-GPG-KEY-Icehouse-SIG
+rsync {{ env['VAULT'] }}/keystonerc /root/.keystonerc
+
+echo "Openstack python clients"
+yum -y install python-novaclient python-keystoneclient python-neutronclient python-glanceclient python-heatclient python-neutronclient MySQL-python
+
+echo "Configuring iptables"
+# Remove the line
+sed -i "/^-A INPUT -m state --state NEW -s {{ env['MGMT_CIDR']|replace('/','\/') }} -j ACCEPT/ d" /etc/sysconfig/iptables
+# Insert it before the other line
+sed -i "/^-A INPUT -m state --state NEW .*/ i \
+-A INPUT -m state --state NEW -s {{ env['MGMT_CIDR']|replace('/','\/') }} -j ACCEPT" /etc/sysconfig/iptables
+service iptables restart
+    
+echo "Copying Keystone credentials"
+rsync {{ env['VAULT'] }}/keystonerc /root/.keystonerc
+
+# - name: Adding the supernode as known_hosts
+#   shell: echo 'todo'
+# # Supernode needs to reach everywhere
+# #    - copy: src={{ env['MM_HOME'] }}/.ssh/id_rsa dest=/root/.ssh/id_rsa

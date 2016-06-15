@@ -1,0 +1,97 @@
+{# LDAP #}
+ldap:{{ env['CONFIGS'] }}/ldap_conf
+ldap:{{ env['MOSLER_HOME'] }}/ldap/ldap
+ldap:{{ env['MOSLER_HOME'] }}/ldap/import_uppmax_user
+ldap:{{ env['MOSLER_HOME'] }}/ldap/pamauth
+ldap:{{ env['MOSLER_HOME'] }}/thinlinc-master/auth_token
+ldap:{{ env['MOSLER_HOME'] }}/thinlinc-master/pam_auth_token
+
+{# Thinlinc #}
+thinlinc-master:{{ env['TL_HOME'] }}/ {# Make sure there is a / at the end #}
+thinlinc-master:{{ env['CONFIGS'] }}/tl_answers
+thinlinc-master:{{ env['MOSLER_HOME'] }}/thinlinc-master/
+
+{# Openstack common files #}
+{% set machines = [ 'openstack-controller', 'networking-node', 'supernode', 'compute1', 'compute2', 'compute3' ] -%}
+{% for m in machines %}
+{{ m }}:{{ env['CONFIGS'] }}/rdo-release.repo
+{{ m }}:{{ env['CONFIGS'] }}/RPM-GPG-KEY-Icehouse-SIG
+{{ m }}:{{ env['CONFIGS'] }}/keystonerc
+{% endfor %}
+
+{# Openstack controller #}
+openstack-controller:{{ env['MOSLER_MISC'] }}/ {# Make sure there is a / at the end #}
+{% if env['DO_CHEAT'] == 'yes' %}
+openstack-controller:{{ env['CONFIGS'] }}/openstack_db_dump.sql
+{% else %}
+openstack-controller:{{ env['CONFIGS'] }}/openstack_db.sql
+{% endif %}
+
+openstack-controller:{{ env['CONFIGS'] }}/neutron.conf
+openstack-controller:{{ env['CONFIGS'] }}/keystone.conf
+openstack-controller:{{ env['CONFIGS'] }}/ml2.ini
+openstack-controller:{{ env['CONFIGS'] }}/ovs_neutron_plugin.ini
+openstack-controller:{{ env['CONFIGS'] }}/nova.conf
+openstack-controller:{{ env['CONFIGS'] }}/glance-api.conf
+openstack-controller:{{ env['CONFIGS'] }}/glance-registry.conf
+openstack-controller:{{ env['CONFIGS'] }}/heat.conf
+openstack-controller:{{ env['CONFIGS'] }}/local_settings
+
+openstack-controller:{{ env['MOSLER_IMAGES'] }}/project-computenode-stable
+openstack-controller:{{ env['MOSLER_IMAGES'] }}/project-loginnode-stable
+openstack-controller:{{ env['MOSLER_IMAGES'] }}/topolino-q-stable
+
+openstack-controller:{{ env['MOSLER_HOME'] }}/bastion/map_thinlinc_nginx
+openstack-controller:{{ env['MOSLER_HOME'] }}/bastion/nginx_tl_template.conf
+
+{# Openstack neutron #}
+networking-node:{{ env['CONFIGS'] }}/neutron.conf
+networking-node:{{ env['CONFIGS'] }}/ml2.ini
+networking-node:{{ env['CONFIGS'] }}/ovs_neutron_plugin.ini
+
+{# Openstack Copmute nodes #}
+{% set nodes = [ 'compute1', 'compute2', 'compute3' ] -%}
+{% for m in nodes %}
+{{ m }}:{{ env['CONFIGS'] }}/neutron.conf
+{{ m }}:{{ env['CONFIGS'] }}/ml2.ini
+{{ m }}:{{ env['CONFIGS'] }}/ovs_neutron_plugin.ini
+{{ m }}:{{ env['CONFIGS'] }}/nova.conf
+{% endfor %}
+
+{# Supernode #}
+supernode:{{ env['MOSLER_HOME'] }}/supernode/fix_proj.sh
+supernode:{{ env['MOSLER_HOME'] }}/supernode/import_user
+supernode:{{ env['MOSLER_HOME'] }}/supernode/passwd_line
+supernode:{{ env['MOSLER_HOME'] }}/supernode/queue_responder
+supernode:{{ env['MOSLER_HOME'] }}/supernode/remove_stack.sh
+supernode:{{ env['MOSLER_HOME'] }}/supernode/sync_exporters
+supernode:{{ env['MOSLER_HOME'] }}/supernode/sync_grantfile
+supernode:{{ env['MOSLER_HOME'] }}/supernode/tenant-valid
+supernode:{{ env['MOSLER_HOME'] }}/supernode/uppmax-links.sh
+supernode:{{ env['MOSLER_HOME'] }}/supernode/uppmax-sync.sh
+supernode:{{ env['MOSLER_HOME'] }}/supernode/project_gid
+supernode:{{ env['MOSLER_HOME'] }}/supernode/project_ips
+supernode:{{ env['MOSLER_HOME'] }}/supernode/project_members
+supernode:{{ env['MOSLER_HOME'] }}/supernode/refreshimage
+supernode:{{ env['MOSLER_HOME'] }}/supernode/setup_homedir.sh
+supernode:{{ env['MOSLER_HOME'] }}/supernode/thinlinc_proj_setup
+supernode:{{ env['MOSLER_HOME'] }}/supernode/create_project.sh
+supernode:{{ env['MOSLER_HOME'] }}/supernode/create_heat_template.sh
+supernode:{{ env['MOSLER_HOME'] }}/supernode/create_omd_config.sh
+supernode:{{ env['MOSLER_HOME'] }}/supernode/get_vlan.sh
+supernode:{{ env['MOSLER_HOME'] }}/supernode/heat_add_compute.sh
+supernode:{{ env['CONFIGS'] }}/mosler-template-parameters
+supernode:{{ env['CONFIGS'] }}/mosler-template-resources-private_net-only
+supernode:{{ env['CONFIGS'] }}/mosler-template-resources-network
+supernode:{{ env['CONFIGS'] }}/mosler-template-resources-secgroups
+supernode:{{ env['CONFIGS'] }}/mosler-template-resources-loginnode
+supernode:{{ env['CONFIGS'] }}/mosler-template-resources-servicenode
+supernode:{{ env['CONFIGS'] }}/create_nfs_share.sh
+supernode:{{ env['CONFIGS'] }}/nfs_san_check.sh
+
+{# Filsluss #}
+filsluss:{{ env['MOSLER_HOME'] }}/filsluss/getusers
+filsluss:{{ env['MOSLER_HOME'] }}/filsluss/sshd_config
+
+{# END #}
+

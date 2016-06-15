@@ -1,25 +1,3 @@
-#!/bin/sh
-
-sed -i -e 's/^olcRootDN:.*/olcRootDN: cn=Manager,dc=mosler,dc=bils,dc=se/' '/etc/openldap/slapd.d/cn=config/olcDatabase={2}bdb.ldif'
-sed -i -e 's/^olcSuffix:.*/olcSuffix: dc=mosler,dc=bils,dc=se/' '/etc/openldap/slapd.d/cn=config/olcDatabase={2}bdb.ldif'
-
-if grep ^olcRootPW '/etc/openldap/slapd.d/cn=config/olcDatabase={2}bdb.ldif' ; then
-  sed -i -e 's/^olcRootPw:.*/olcRootPW:  {SSHA}SGuX86SN0jX+X4M+1Gxlih4MmjEdh+gM/' '/etc/openldap/slapd.d/cn=config/olcDatabase={2}bdb.ldif'
-else
-  echo 'olcRootPW:  {SSHA}SGuX86SN0jX+X4M+1Gxlih4MmjEdh+gM' >> '/etc/openldap/slapd.d/cn=config/olcDatabase={2}bdb.ldif'
-fi
-
-sed -i -e 's/ by dn.base="cn[^"]"/by dn.base="cn=Manager,dc=mosler,dc=bils,dc=se"/' '/etc/openldap/slapd.d/cn=config/olcDatabase={2}bdb.ldif'
-
-/sbin/service slapd restart
-chkconfig slapd on
-
-# Reload iptables rules.
-/sbin/service iptables restart
-
-ldapadd -c -D cn=Manager,dc=mosler,dc=bils,dc=se -w ldap <<EOF
-
-
 dn: dc=mosler,dc=bils,dc=se
 objectClass: dcObject
 objectClass: organization
@@ -30,7 +8,6 @@ o: BILS
 dn: ou=Users,dc=mosler,dc=bils,dc=se
 objectClass: organizationalUnit
 ou: Users
-
 
 
 dn: uid=nova,ou=Users,dc=mosler,dc=bils,dc=se
@@ -51,7 +28,6 @@ gidNumber: 162
 userPassword: nova
 mail: nova@localhost
 destinationIndicator: services
-
 
 
 dn: uid=keystone,ou=Users,dc=mosler,dc=bils,dc=se
@@ -94,7 +70,6 @@ mail: glance@localhost
 destinationIndicator: services
 
 
-
 dn: uid=neutron,ou=Users,dc=mosler,dc=bils,dc=se
 uid: neutron
 loginShell: /bin/bash
@@ -133,6 +108,7 @@ gidNumber: 166
 userPassword: heat
 mail: heat@localhost
 destinationIndicator: services
+
 
 # admin, Users, mosler.bils.se
 dn: uid=admin,ou=Users,dc=mosler,dc=bils,dc=se
@@ -192,6 +168,7 @@ mail: pi2@localhost
 uidNumber: 20002
 gidNumber: 20002
 
+
 dn: uid=user1,ou=Users,dc=mosler,dc=bils,dc=se
 uid: user1
 loginShell: /bin/bash
@@ -209,6 +186,7 @@ homeDirectory: /home/user1
 mail: user1@localhost
 uidNumber: 20003
 gidNumber: 20003
+
 
 dn: uid=user2,ou=Users,dc=mosler,dc=bils,dc=se
 uid: user2
@@ -228,6 +206,7 @@ mail: user2@localhost
 uidNumber: 20004
 gidNumber: 20004
 
+
 dn: uid=user3,ou=Users,dc=mosler,dc=bils,dc=se
 uid: user3
 loginShell: /bin/bash
@@ -245,6 +224,7 @@ homeDirectory: /home/user3
 mail: user@localhost
 uidNumber: 20005
 gidNumber: 20005
+
 
 dn: uid=export1,ou=Users,dc=mosler,dc=bils,dc=se
 uid: export1
@@ -264,10 +244,3 @@ mail: user@localhost
 uidNumber: 20006
 gidNumber: 20006
 
-
-
-
-EOF
-
-
-exit 0

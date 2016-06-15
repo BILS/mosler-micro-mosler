@@ -1,0 +1,13 @@
+# -*-sh-*-
+
+echo "RabbitMQ server"
+yum -y install rabbitmq-server
+
+echo "Starting the Message Broker"
+service rabbitmq-server start
+chkconfig rabbitmq-server on
+
+echo "Preparing the RabbitMQ user"
+rabbitmqctl add_user openstack rabbit || true
+rabbitmqctl set_permissions openstack ".*" ".*" ".*" || true
+
