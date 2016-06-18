@@ -1,0 +1,45 @@
+#!/bin/sh
+
+PATH=$PATH:/sbin:/usr/sbin
+
+myuid=`id -u`
+
+if [ "$myuid" -eq 0 ]; then
+  :
+else
+  echo "Please run as root/sudo"
+  exit 1
+fi
+
+source /root/.keystonerc
+
+check_and_make_exporter () {
+
+  if keystone  user-role-list --user="$1" --tenant="$2" | grep -q exporter ; then
+    :
+  else
+    keystone  user-role-add --user="$1" --tenant="$2" --role="exporter"  >/dev/null
+  fi
+
+}
+
+
+sed -e 's/[:,]/ /g' /etc/uppmaxconfig/filsluss_exportmembers  | while read project users ; do
+  for user in $users; do
+    check_and_make_exporter "$user" "$project"
+  done
+done
+
+keystone user-list | fgrep '@' | while read a username c; do 
+  keystone tenant-list | fgrep bils20 | while read d e f tenant g; do
+    if grep "$tenant:.*$username" /etc/uppmaxconfig/filsluss_exportmembers; then
+      :
+    else
+      # User not tokenadmin, verify
+      if  keystone  user-role-list --user="$username" --tenant="$tenant" | grep -q exporter ; then
+         keystone  user-role-remove --user="$username" --tenant="$tenant" --role="exporter"
+      fi    
+    fi
+  done
+done
+

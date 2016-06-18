@@ -1,0 +1,9 @@
+!/bin/sh
+
+
+if grep -q "^$1:" /etc/uppmaxconfig/topolino_groups; then
+  sed -ne "s/$1://"p /etc/uppmaxconfig/topolino_groups
+else
+  echo 50000
+  exit 1
+fi

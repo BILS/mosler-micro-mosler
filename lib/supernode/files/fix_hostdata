@@ -1,0 +1,111 @@
+#!/bin/bash
+
+. /root/.keystonerc
+PATH=/usr/local/sbin:/usr/local/bin:$PATH
+
+cd /meles/v1 || exit 1
+
+for proj in *; do 
+  if tenant-valid "$proj"; then
+
+    # Get info for login and service nodes.
+
+    login=`nova --os-tenant-name "$proj" list | sed -ne '/login/ s/.*private_net=\([0-9.]*\).*/\1/p'`
+    service=`nova --os-tenant-name "$proj" list | sed -ne '/service/ s/.*private_net=\([0-9.]*\).*/\1/p'`
+
+
+
+    mkdir -p "$proj/misc/sw/share/slurm/topolino/"
+    mkdir -p "$proj/misc/etc/"
+
+    cat - > "$proj/misc/sw/share/slurm/topolino/grantfile.new" <<EOF
+staff:2000:20120214:20200214:uppmax:Jukka Komminaho:lka
+testqt:2000:20140730:20300730:uppmax:Lennart Karlsson:lka
+EOF
+
+    grep "^$proj" /etc/uppmaxconfig/grantfile >> "$proj/misc/sw/share/slurm/topolino/grantfile.new"
+    mv "$proj/misc/sw/share/slurm/topolino/grantfile.new" "$proj/misc/sw/share/slurm/topolino/grantfile"
+
+    touch "$proj/misc/etc/hosts.new" 
+    touch "$proj/misc/etc/slurmnodes.conf.new"
+
+    echo 'NodeName=vtdummy NodeAddr=10.254.0.254 RealMemory=1 Sockets=1 CoresPerSocket=1 Feature=thin Weight=0 State=down' >> "$proj/misc/etc/slurmnodes.conf.new"
+    echo 'NodeName=vtlargedummy NodeAddr=10.254.0.253 RealMemory=1 Sockets=1 CoresPerSocket=8 Feature=thin Weight=0 State=down' >> "$proj/misc/etc/slurmnodes.conf.new"
+
+
+    echo 10.254.0.254 vtdummy>> "$proj/misc/etc/hosts.new"
+    echo 10.254.0.253 vtlargedummy>> "$proj/misc/etc/hosts.new"
+
+    echo 10.10.10.3 tos1 tos1.mosler.uppmax.uu.se >> "$proj/misc/etc/hosts.new"
+
+
+    if [ -n "$login" ]; then
+        echo "$login project-loginnode login loginnode ${proj}-login_node ${proj}-login " >> "$proj/misc/etc/hosts.new"
+    fi
+
+    if [ -n "$service" ]; then
+        echo "$service project-servicenode ${proj}-service ${proj}-service_node service servicenode topolino-q" >> "$proj/misc/etc/hosts.new"
+    fi
+
+    # Work through all machines for the tenant and assign numbers for new workers as well as create hosts/slurm config
+
+    nova --os-tenant-name "$proj" list | grep compute | tr -d ' ' | fgrep '|ACTIVE|' | cut -d'|' -f 2 | while read worker; do
+        ip=`nova show "$worker" | grep ' network' | tr -d ' ' | cut -d'|' -f 3`
+        number=`nova show "$worker" | grep metadata | tr -d ' '| cut -d'|' -f 3 | jq -r .workernumber `
+        cores=`nova show "$worker" | grep flavor | tr -d ' '| cut -d'|' -f 3 | sed -e 's,cores*(.*,,' -e 's,^mosler\.,,'` 
+        memory=`echo 7200 '*' $cores | bc`
+
+        if [ "x$number" = xnull ]; then
+            
+            maxid=`nova  --os-tenant-name "$proj" show "$proj-service_node" | grep metadata | tr -d ' '| cut -d'|' -f 3 | jq -r .workermaxid `
+            
+            if [ "x$maxid" = xnull ]; then
+                maxid=0
+            fi
+
+            number=`echo "$maxid" + 1 | bc`
+            nova --os-tenant-name "$proj" meta "$proj-service_node" set "workermaxid=$number"
+
+            nova meta "$worker" set "workernumber=$number" 
+        fi
+
+        echo "$ip"  "vt$number" >> "$proj/misc/etc/hosts.new"
+
+        echo  "NodeName=vt$number NodeAddr="$ip" RealMemory=$memory Sockets=$cores CoresPerSocket=1 Feature=thin,usage_mail Weight=1" >> "$proj/misc/etc/slurmnodes.conf.new"
+    done 
+
+    #  sed -n -e '/OS-EXT-SRV-ATTR:instance_name/ s/.*-\([0-9a-f]*\).*/\1/p'
+    allnodes=`sed -ne 's/.* vt/vt/p' "$proj/misc/etc/hosts.new" | tr '\n' ','`
+    allnodes="${allnodes%,} "   
+
+
+    fullnodes="vtdummy,vtlargedummy,"`grep Sockets=8 "$proj/misc/etc/slurmnodes.conf.new" | sed -ne 's/NodeName=\([^ ]*\) .*/\1/p' | tr '\n' ','`
+    fullnodes="${fullnodes%,} "
+
+    cat - >> "$proj/misc/etc/slurmnodes.conf.new" <<EOF
+PartitionName=all Nodes=$allnodes Shared=EXCLUSIVE DefaultTime=00:00:01 MaxTime=14400 State=DOWN
+PartitionName=core Nodes=$allnodes Default=YES Shared=NO DefaultTime=00:00:01 MaxTime=14400 MaxNodes=1 State=UP
+PartitionName=node Nodes=$fullnodes Shared=EXCLUSIVE DefaultTime=00:00:01 MaxTime=14400 State=UP
+PartitionName=devcore Nodes=$allnodes Default=NO Shared=NO DefaultTime=00:00:01 MaxTime=14400 MaxNodes=1 State=UP
+PartitionName=devel Nodes=$fullnodes Shared=EXCLUSIVE DefaultTime=00:00:01 MaxTime=14400 State=UP
+
+EOF
+    
+    mv "$proj/misc/etc/hosts.new" "$proj/misc/etc/hosts"
+    mv "$proj/misc/etc/slurmnodes.conf.new" "$proj/misc/etc/slurmnodes.conf"
+
+  fi
+done
+
+neutron floatingip-list  | tr -d ' ' | fgrep '|' | fgrep -v fixed_ip | cut -d'|' -f2 | while read ipid; do 
+  if  neutron floatingip-show "$ipid" | fgrep -q ACTIVE;  then
+    ip=`neutron floatingip-show "$ipid"  | tr -d ' ' | fgrep 'floating_ip_address' | cut -d'|' -f3 ` 
+    tenantid=`neutron floatingip-show "$ipid"  | tr -d ' ' | fgrep 'tenant_id' | cut -d'|' -f3 `
+    tenant=`keystone tenant-get "$tenantid" | tr -d ' ' | fgrep '|name|' | cut -d'|' -f 3`
+    nsupdate -k /etc/rndc.key 2>/dev/null <<EOF
+update delete $tenant-login.mosler.uppmax.uu.se.
+update add $tenant-login.mosler.uppmax.uu.se. 120 in a $ip
+  
+EOF
+  fi
+done 

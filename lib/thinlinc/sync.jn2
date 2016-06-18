@@ -1,0 +1,27 @@
+# -*-sh-*-
+
+echo "Installing Thinlinc packages"
+yum -y install {{ env['VAULT'] }}/*x86_64.rpm {{ env['VAULT'] }}/*noarch.rpm xauth
+
+echo "Copying config files"
+{% set files = [ 'auth_token',
+		 'establish_user',
+		 'mapproj',
+		 'pam_auth_token',
+		 'vsmconfigurator.sh'
+	       ] -%}
+{% for file in files %}
+rsync -a {{ env['VAULT'] }}/{{ file }}  /usr/local/sbin/{{ file }}
+chown root:root /usr/local/sbin/{{ file }}
+chmod 0755 /usr/local/sbin/{{ file }}
+{% endfor %}
+
+# Not found
+# /usr/local/sbin/ssh_auth_token
+# /usr/local/sbin/vsmconfig.sh
+
+# Unused
+# {{ env['VAULT'] }}/thinlinc-master/project
+# {{ env['VAULT'] }}/thinlinc-master/projectallowed
+# {{ env['VAULT'] }}/thinlinc-master/sshd
+# {{ env['VAULT'] }}/thinlinc-master/thinlinc

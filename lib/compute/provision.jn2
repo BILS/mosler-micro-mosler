@@ -1,0 +1,45 @@
+# -*-sh-*-
+
+echo "Configuring iptables"
+# Remove the line
+sed -i "/^-A INPUT -m state --state NEW -s {{ env['MGMT_CIDR']|replace('/','\/') }} -j ACCEPT/ d" /etc/sysconfig/iptables
+# Insert it before the other line
+sed -i "/^-A INPUT -m state --state NEW .*/ i \
+-A INPUT -m state --state NEW -s {{ env['MGMT_CIDR']|replace('/','\/') }} -j ACCEPT" /etc/sysconfig/iptables
+service iptables restart
+    
+
+echo "System config"
+## RegExp, Replacement
+{% set lines = [
+	('^\s*net.ipv4.ip_forward\s*=.*$',                 'net.ipv4.ip_forward=1'                 ),
+	('^\s*net.ipv4.conf.all.rp_filter\s*=.*$',         'net.ipv4.conf.all.rp_filter=0'         ),
+	('^\s*net.ipv4.conf.default.rp_filter\s*=.*$',     'net.ipv4.conf.default.rp_filter=0'     ),
+	('^\s*net.bridge.bridge-nf-call-arptables\s*=.*$', 'net.bridge.bridge-nf-call-arptables=1' ),
+	('^\s*net.bridge.bridge-nf-call-iptables\s*=.*$',  'net.bridge.bridge-nf-call-iptables=1'  ),
+	('^\s*net.bridge.bridge-nf-call-ip6tables\s*=.*$', 'net.bridge.bridge-nf-call-ip6tables=1' )
+] -%}
+{% for regexp, line in lines %}
+sed -i -e 's/{{ regexp }}/{{ line }}/' /etc/sysctl.conf
+{% endfor %}
+
+echo "Starting OpenVSwitch"
+service openvswitch start
+chkconfig openvswitch on
+    
+echo "Creating the OVS bridge"
+ovs-vsctl add-br br-eth1 || true
+
+echo "Adding eth1 to the OVS bridge"
+ovs-vsctl add-port br-eth1 eth1 || true
+
+echo "Starting Nova and Neutron agents"
+service libvirtd start
+service messagebus start
+service openstack-nova-compute start
+service neutron-openvswitch-agent start
+
+chkconfig libvirtd on
+chkconfig messagebus on
+chkconfig openstack-nova-compute on
+chkconfig neutron-openvswitch-agent on

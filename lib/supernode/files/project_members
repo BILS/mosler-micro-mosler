@@ -1,0 +1,9 @@
+#!/bin/sh
+
+. /root/.keystonerc
+
+token=`keystone token-get  | sed -ne 's/.*\sid[ |]*\([0-9a-f]*\).*/\1/p'`
+projid=`keystone tenant-get "$1"  | sed -ne 's/.*\sid[ |]*\([0-9a-f]*\).*/\1/p'`
+
+curl -s -H "X-Auth-Token: $token" "$OS_AUTH_URL"/tenants/"$projid"/users | jq -r .users[].username
+

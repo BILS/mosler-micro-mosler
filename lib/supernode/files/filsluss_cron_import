@@ -1,0 +1,38 @@
+#!/bin/sh
+
+cd /meles/import/home || exit 1
+
+tmplocation="/meles/v1/incoming"
+
+runtime=`date +%Y%m%d%H%M`
+
+find . -type f -mmin '+5'  | while read fname; do
+
+  uname=`echo $fname | sed -e 's,^\./\([^/]*\)/.*,\1,'`
+  project=`echo $fname | sed -e "s,^\./$uname/\([^/]*\)/.*,\1,"`
+  newname=`echo $fname | sed -e "s,^\./$uname/$project/,," | tr / _ `
+
+  if [ "x$project" = xOUTGOING ]; then
+    :
+  else 
+      pgid=`/usr/local/sbin/project_gid "$project"` 
+      ugid=`stat -c '%u' "$fname"`
+
+
+      logger "Importing $fname for user $uname in project $project"
+      
+      dstbase="/meles/v1/$project/proj/$project/INBOX"
+      dst="$dstbase/$runtime/$user/"
+      # Get on the right filesystem
+      mv "$fname" "$tmplocation/$newname"
+
+      # Create and move to destination
+      mkdir -p "$dst"
+      mv "$tmplocation/$newname" "$dst"
+      chgrp -R "$pgid" "$dstbase"
+      chown "$uname" "$dst/$newname" 
+      chmod -R ug+rw  "$dstbase"
+      chmod g+s "$dst" "$dstbase"
+  fi
+
+done

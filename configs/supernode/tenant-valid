@@ -1,6 +1,0 @@
-#!/bin/sh
-
-. /root/.keystonerc
-PATH=/usr/local/sbin:$PATH
-
-grep -q "^$1:" /etc/uppmaxconfig/grantfile

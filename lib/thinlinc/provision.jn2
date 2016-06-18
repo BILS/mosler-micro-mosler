@@ -1,0 +1,16 @@
+# -*-sh-*-
+
+echo "Setting up Thinlinc"
+/opt/thinlinc/sbin/tl-setup -a {{ env['VAULT'] }}/tl_answers
+
+echo "Configuring Thinlinc web access"
+sed -i 's/^listen=.*$/listen=443/' /opt/thinlinc/etc/conf.d/webaccess.hconf
+
+cat > /etc/cron.d/tl-statistics-cron <<EOF
+# ThinLinc Licence statistics collector.
+*/5 * * * * root /opt/thinlinc/sbin/tl-collect-licensestats
+EOF
+
+cat > /etc/cron.d/vsmconfigurator <<EOF
+* * * * * root pgrep -f '^/bin/sh /usr/local/sbin/vsmconfigurator.sh' >/dev/null || /usr/local/sbin/vsmconfigurator.sh </dev/null   >/dev/null 2>/dev/null
+EOF

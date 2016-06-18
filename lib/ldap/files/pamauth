@@ -1,0 +1,23 @@
+#!/bin/bash
+
+read pass
+
+# Get the last six chars
+totp=${pass: -6 : 6}
+realpass=${pass: 0 : -6 }
+
+echo 0 >> /tmp/pam
+grep -q "^$PAM_USER:" /etc/twofactor || exit 1
+secret=`grep "^$PAM_USER:" /etc/twofactor | sed -e 's/.*://'`
+
+# Verify twofactor
+oathtool --totp -b "$secret" -w 3 "$totp" || exit 1
+
+unset SSH_AUTH_SOCK
+
+DROPBEAR_PASSWORD="$realpass"
+export DROPBEAR_PASSWORD
+
+/usr/bin/dbclient  -l "$PAM_USER" tintin.uppmax.uu.se  echo OK 2>/dev/null </dev/null | grep -q OK > /dev/null || exit 1
+
+exit 0

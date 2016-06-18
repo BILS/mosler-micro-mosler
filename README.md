@@ -18,13 +18,11 @@ settings will probably be given to you by your _openstack administrator_.
 The scripts define some variables (in `settings.sh`)
 * `MM_HOME` (that currently folder)
 * `TL_HOME` (currently pointing to `/home/jonas/thinlinc`)
-* `MOSLER_MISC` (currently pointing to `/home/jonas/misc`)
 * `MOSLER_IMAGES` (currently pointing to `/home/jonas/mosler-images`)
 
 The scripts assume that 
 * A CentOS6 glance image is installed
 * The Thinlinc packages are available in `$TL_HOME`
-* Some misc packages are available in `$MOSLER_MISC`
 * And the mosler images are available in `$MOSLER_IMAGES`
 
 ## Execution
@@ -33,10 +31,13 @@ networks and security groups, prior to creating the virtual machines.
 It will start the VMs with proper IP information. In subsequent runs,
 `init.sh` will only create the VMs.
 
-Run `provision.sh` in order to set up the ssh environment and run the
-provisioning scripts for each VM. This script is divided in 2 phases:
-the first one copies the required files to the appropriate servers,
-and the second one configures the servers.
+Run `sync.sh` in order to set up the ssh environment and copy the
+required files to the appropriate servers (along with installing the
+required packages).
+
+Run `provision.sh` in order to set up the ssh environment and
+provision each VM. This configures the servers. The task should be
+idempotent.
 
 The `clean.sh` script can be run with the --all flag, to destroy
 routers, networks, security groups and floating IPs.  Otherwise, it
@@ -57,10 +58,12 @@ You can append the `-h` flag to see the command options.
 	# The openstack user 'fred' must maybe be an admin on the tenant 'mmosler1'
 	./init.sh --all # You'll be prompted at the end for a reboot.
 	                # Rebooting will help the partition to correctly resize to the disk size
-	./provision.sh # Wait a bit, servers are probably not done rebooting
+	./sync.sh # Wait a bit, servers are probably not done rebooting
+	./provision.sh 
 	
 	# Later
 	./provision.sh # to just re-configure µ-mosler. The task is idempotent.
 	./clean.sh     # to destroy the VMs
 	./init.sh      # to re-create them, but not the networks, routers, etc...
+	./sync.sh      # Wait again a bit, still probably rebooting
 	./provision.sh # shoot again...

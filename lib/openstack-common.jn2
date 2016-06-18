@@ -8,14 +8,6 @@ rsync {{ env['VAULT'] }}/keystonerc /root/.keystonerc
 echo "Openstack python clients"
 yum -y install python-novaclient python-keystoneclient python-neutronclient python-glanceclient python-heatclient python-neutronclient MySQL-python
 
-echo "Configuring iptables"
-# Remove the line
-sed -i "/^-A INPUT -m state --state NEW -s {{ env['MGMT_CIDR']|replace('/','\/') }} -j ACCEPT/ d" /etc/sysconfig/iptables
-# Insert it before the other line
-sed -i "/^-A INPUT -m state --state NEW .*/ i \
--A INPUT -m state --state NEW -s {{ env['MGMT_CIDR']|replace('/','\/') }} -j ACCEPT" /etc/sysconfig/iptables
-service iptables restart
-    
 echo "Copying Keystone credentials"
 rsync {{ env['VAULT'] }}/keystonerc /root/.keystonerc
 

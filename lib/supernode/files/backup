@@ -1,0 +1,16 @@
+#!/bin/sh
+
+find /usr/local/backup -mtime +20 -type f -exec rm '{}' ';'
+
+for p in `virsh list --name`; do
+  mkdir -p "/usr/local/backup/$p"
+  for q in /etc /usr/local /var/log; do
+    rsync -a "root@$p:$q/" "/usr/local/backup/$p/$q/"
+  done
+done
+
+dsmc incr -su=yes /etc/ /usr/local/
+
+for p in /meles/*; do
+  dsmc incr -su=yes "$p"
+done

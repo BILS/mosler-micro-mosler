@@ -1,0 +1,12 @@
+#!/bin/sh
+
+read token
+
+# Work around bug in thinlinc pamtester, fixed later on
+
+for p in '' 0 1 2 3 4 5 6 7 8 9 a b c d e f; do
+  /usr/local/sbin/auth_token "${token}$p" "$PAM_USER" && exit 0
+done
+
+exit 1
+

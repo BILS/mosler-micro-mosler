@@ -1,0 +1,28 @@
+# -*-sh-*-
+
+echo "Configuring iptables"
+# Remove the line
+sed -i '/^-A INPUT -m state --state NEW -m tcp -p tcp --dport 389 -j ACCEPT/ d' /etc/sysconfig/iptables
+# Insert it before --dport 22
+sed -i '/^-A INPUT -m state --state NEW -m tcp -p tcp --dport 22 -j ACCEPT/ i \
+-A INPUT -m state --state NEW -m tcp -p tcp --dport 389 -j ACCEPT' /etc/sysconfig/iptables
+service iptables restart
+
+sed -i -e 's/^olcRootDN:.*/olcRootDN: cn=Manager,dc=mosler,dc=bils,dc=se/' '/etc/openldap/slapd.d/cn=config/olcDatabase={2}bdb.ldif'
+sed -i -e 's/^olcSuffix:.*/olcSuffix: dc=mosler,dc=bils,dc=se/' '/etc/openldap/slapd.d/cn=config/olcDatabase={2}bdb.ldif'
+
+if grep ^olcRootPW '/etc/openldap/slapd.d/cn=config/olcDatabase={2}bdb.ldif' ; then
+  sed -i -e 's/^olcRootPw:.*/olcRootPW:  {SSHA}SGuX86SN0jX+X4M+1Gxlih4MmjEdh+gM/' '/etc/openldap/slapd.d/cn=config/olcDatabase={2}bdb.ldif'
+else
+  echo 'olcRootPW:  {SSHA}SGuX86SN0jX+X4M+1Gxlih4MmjEdh+gM' >> '/etc/openldap/slapd.d/cn=config/olcDatabase={2}bdb.ldif'
+fi
+
+sed -i -e 's/ by dn.base="cn[^"]"/by dn.base="cn=Manager,dc=mosler,dc=bils,dc=se"/' '/etc/openldap/slapd.d/cn=config/olcDatabase={2}bdb.ldif'
+
+service slapd restart
+chkconfig slapd on
+
+echo "LDAP Configuration"
+if ! ldapadd -c -D cn=Manager,dc=mosler,dc=bils,dc=se -w ldap -f {{ env['VAULT'] }}/users ; then
+    echo "Error with configuring the LDAP users"
+fi

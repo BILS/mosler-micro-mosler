@@ -1,0 +1,66 @@
+# -*-sh-*-
+
+#############################################################
+{% include 'openstack-common.jn2' %}
+
+yum -y install nc
+
+#############################################################
+echo "Copying config files"
+{% set files = [ 'add_user_to_project.sh',
+		 'create_heat_template.sh',
+		 'create_nfs_share.sh',
+		 'create_project.sh',
+		 'fix_proj.sh',
+		 'get_vlan.sh',
+		 'heat_add_compute.sh',
+		 'import_user',
+		 'nfs_san_check.sh',
+		 'queue_responder',
+		 'remove_stack.sh',
+		 'sync_exporters',
+		 'sync_grantfile',
+		 'sync_tokenadmin',
+		 'tenant-valid',
+		 'uppmax-links.sh',
+		 'uppmax-sync.sh'
+	       ] -%}
+{% for file in files %}
+rsync -a {{ env['VAULT'] }}/{{ file }}  /usr/local/bin/{{ file }}
+chown root:root /usr/local/bin/{{ file }}
+chmod 0755 /usr/local/bin/{{ file }}
+{% endfor %}
+
+{% set files = [ 'approveimage',
+		 'backup',
+		 'filsluss_cron_export',
+		 'filsluss_cron_import',
+		 'fix_hostdata',
+		 'fix_userdata',
+		 'project_gid',
+		 'project_ips',
+		 'project_members',
+		 'refreshimage',
+		 'remove_project.sh',
+		 'setup_homedir.sh',
+		 'thinlinc_proj_setup'
+	       ] -%}
+{% for file in files %}
+rsync -a {{ env['VAULT'] }}/{{ file }}  /usr/local/sbin/{{ file }}
+chown root:root /usr/local/sbin/{{ file }}
+chmod 0755 /usr/local/sbin/{{ file }}
+{% endfor %}
+
+mkdir -p /usr/local/heat
+
+{% set files = [ 'mosler-template-resources-private_net-only',
+		 'mosler-template-resources-network',
+		 'mosler-template-resources-secgroups',
+		 'mosler-template-resources-loginnode',
+		 'mosler-template-resources-servicenode',
+		 'mosler-template-parameters'
+	       ] -%}
+{% for file in files %}
+rsync -a {{ env['VAULT'] }}/{{ file }} /usr/local/heat/{{ file }}
+chmod 0755 /usr/local/heat/{{ file }}
+{% endfor %}

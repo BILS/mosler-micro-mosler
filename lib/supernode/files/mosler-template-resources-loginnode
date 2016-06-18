@@ -1,0 +1,29 @@
+
+  login_node_public_port:
+     type: OS::Neutron::Port
+     properties:
+        name: { 'Fn::Join': [ "", [{ get_param: project_name }, "-login_node_public_port" ]]}
+        network_id: { get_resource: private_net }
+        security_groups: [ { get_resource: server_security_group } ]
+        fixed_ips:
+         - ip_address: { get_param: login_node_ip }
+
+  login_node_floating_ip:
+     type: OS::Neutron::FloatingIP
+     properties:
+        floating_network_id: { get_param: public_net_id }
+        port_id: { get_resource: login_node_public_port }
+
+
+  login_node:
+    type: OS::Nova::Server
+    depends_on: [ private_net, private_subnet ]
+    properties:
+      name: { 'Fn::Join': [ "", [{ get_param: project_name }, "-login_node" ]]}
+      image: { get_param: login_node_image }
+      availability_zone: "serv-login"
+      flavor: { get_param: login_node_flavor }
+      networks:
+        - port: { get_resource: login_node_public_port }
+
+

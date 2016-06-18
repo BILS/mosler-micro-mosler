@@ -1,0 +1,28 @@
+Protocol 2
+
+SyslogFacility AUTHPRIV
+PermitRootLogin yes
+
+PermitEmptyPasswords no
+PasswordAuthentication yes
+
+ChallengeResponseAuthentication no
+
+KerberosAuthentication no
+
+# GSSAPI options
+GSSAPIAuthentication no
+UsePAM yes
+
+MaxAuthTries 16
+HostCertificate /etc/ssh/ssh_host_rsa_key-cert.pub
+HostCertificate /etc/ssh/ssh_host_dsa_key-cert.pub
+HostCertificate /etc/ssh/ssh_host_ecdsa_key-cert.pub
+
+# override default of no subsystems
+Subsystem       sftp    internal-sftp
+
+Match Group !root,*
+ForceCommand  internal-sftp
+ChrootDirectory /%h
+

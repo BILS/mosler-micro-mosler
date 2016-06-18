@@ -1,0 +1,16 @@
+#!/bin/sh
+
+if [ "$#" -ne 2 ]; then
+  echo "Usage: $0 PROJECTNAME IP"
+  exit 1
+fi
+
+pname="$1"
+ip="$2"
+
+if grep -q "^$pname:$ip"'$' /usr/local/etc/tlprojects; then
+  exit 0
+fi
+
+flock /usr/local/etc/tlprojects sed -i "/^$pname:/ d" /usr/local/etc/tlprojects
+echo "$pname:$ip" | flock /usr/local/etc/tlprojects tee -a /usr/local/etc/tlprojects >/dev/null

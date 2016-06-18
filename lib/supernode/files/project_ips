@@ -1,0 +1,12 @@
+#!/bin/sh
+
+. /root/.keystonerc
+
+neutron floatingip-list  | tr -d ' ' | fgrep '|' | fgrep -v fixed_ip | cut -d'|' -f2 | while read ipid; do 
+  if  neutron floatingip-show "$ipid" | fgrep -q ACTIVE;  then
+    ip=`neutron floatingip-show "$ipid"  | tr -d ' ' | fgrep 'floating_ip_address' | cut -d'|' -f3 ` 
+    tenantid=`neutron floatingip-show "$ipid"  | tr -d ' ' | fgrep 'tenant_id' | cut -d'|' -f3 `
+    tenant=`keystone tenant-get "$tenantid" | tr -d ' ' | fgrep '|name|' | cut -d'|' -f 3`
+    echo "$tenant" "$ip"
+  fi
+done | sort -k 1,1 -u

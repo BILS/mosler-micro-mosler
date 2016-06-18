@@ -1,5 +1,0 @@
-  private_net_dummy:
-    type: OS::Neutron::Net
-    properties:
-       name: { 'Fn::Join': [ "", [{ get_param: project_name }, "-private_net_dummy" ]]}
-

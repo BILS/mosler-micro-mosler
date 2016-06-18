@@ -1,0 +1,41 @@
+#!/bin/sh
+
+. /root/.keystonerc
+
+PATH=$PATH:/usr/local/sbin
+
+tmplocation="/meles/import/outgoing"
+
+
+cd /meles/v1 || exit 1
+
+for proj in *; do
+
+    if keystone tenant-get "$proj" 2>/dev/null >/dev/null; then
+     
+     for user in  `project_members "$proj"`; do
+         if keystone --os-tenant-name "$proj" user-role-list --user "$user" | tr -d ' ' | grep -q '|778c12ac40ed4990a9f72655b2abc267|exporter|' ; then
+             # User has export role?
+             
+             find "$proj/proj/$proj/OUTBOX/$user" -type f  | sed -ne "s,^$proj/proj/$proj/OUTBOX/$user,,pg" |  while read dname; do
+                 # Are these paths safe? consider them so for now.
+
+                 logger "Exporting $dname for user $user in project $proj"
+                 uid=`stat -c %u "$proj/proj/$proj/OUTBOX/$user/$dname"`                 
+                 tmpname=`date +fileat%s`
+                 mv "$proj/proj/$proj/OUTBOX/$user/$dname" "$tmplocation/$tmpname"
+                 mkdir -p "/meles/import/home/$user/OUTGOING/$proj/${dname%/*}"
+                 mv "$tmplocation/$tmpname" "/meles/import/home/$user/OUTGOING/$proj/${dname}"
+                 chmod -R og-rwx "/meles/import/home/$user/OUTGOING/"
+                 chown -R "$uid" "/meles/import/home/$user/OUTGOING/"
+             done
+         fi
+         
+         find "/meles/import/home/$user/OUTGOING/" -type f -a -ctime +5 -a -exec rm '{}' ';' 2>/dev/null
+         find "/meles/import/home/$user/OUTGOING/" -type d -a -ctime +5 -a -exec rmdir '{}' ';' 2>/dev/null
+
+     done
+     
+ fi
+done
+

@@ -1,0 +1,18 @@
+# -*-sh-*-
+
+echo "LDAP packages"
+yum -y install openldap-servers openldap-clients
+
+echo "Copying config files"
+{% set files = [ 'import_uppmax_user',
+		 'auth_token',
+		 'pam_auth_token'
+	       ] -%}
+{% for file in files %}
+rsync -a {{ env['VAULT'] }}/{{ file }}  /usr/local/sbin/{{ file }}
+chown root:root /usr/local/sbin/{{ file }}
+chmod 0755 /usr/local/sbin/{{ file }}
+{% endfor %}
+
+
+{# 'passwd_line' #}

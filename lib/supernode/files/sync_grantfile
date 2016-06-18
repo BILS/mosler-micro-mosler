@@ -1,0 +1,24 @@
+#!/bin/sh
+
+PATH=$PATH:/sbin:/usr/sbin
+
+myuid=`id -u`
+
+if [ "$myuid" -eq 0 ]; then
+  :
+else
+  echo "Please run as root/sudo"
+  exit 1
+fi
+
+source /root/.keystonerc
+
+sed -e 's/:.*//' /etc/uppmaxconfig/grantfile | while read proj; do
+  if keystone tenant-get "$proj" >/dev/null 2>/dev/null; then
+   :
+  else
+    /usr/local/bin/create_project.sh "$proj"
+  fi
+  /usr/local/bin/fix_proj.sh "$proj"
+done
+

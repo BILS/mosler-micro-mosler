@@ -1,0 +1,9 @@
+# -*-sh-*-
+
+# cat > /etc/cron.d/fixclock <<EOF
+# * * * * * root flock -n /tmp/clockfix /usr/local/sbin/fixclock.sh 2>/dev/null >/dev/null
+# EOF
+
+cat > /etc/cron.d/getusers <<EOF
+*/5 * * * * root /usr/local/sbin/getusers
+EOF

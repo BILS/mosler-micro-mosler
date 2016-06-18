@@ -89,9 +89,10 @@ if [ $ALL = "yes" ]; then
 
 fi # End cleaning if ALL
 
-[ "$VERBOSE" = "yes" ] && echo "Cleaning init and provision temporary folders"
-[ -d ${INIT_TMP} ] && rm -rf ${INIT_TMP}
-[ -d ${PROVISION_TMP} ] && rm -rf ${PROVISION_TMP}
+if [ -d ${MM_TMP} ]; then
+    [ "$VERBOSE" = "yes" ] && echo "Cleaning the temporary folders"
+    rm -rf ${MM_TMP}
+fi
 
 echo "Cleaning done"
 exit 0

@@ -1,0 +1,25 @@
+# -*-sh-*-
+
+#############################################################
+{% include 'openstack-common.jn2' %}
+
+#############################################################
+
+echo "Openstack Components"
+yum -y install openstack-nova-compute openstack-neutron-ml2 openstack-neutron-openvswitch
+
+echo "Copying config files"
+rsync -a {{ env['VAULT'] }}/neutron.conf           /etc/neutron/neutron.conf
+rsync -a {{ env['VAULT'] }}/ml2.ini                /etc/neutron/plugins/ml2/ml2.ini
+rsync -a {{ env['VAULT'] }}/ovs_neutron_plugin.ini /etc/neutron/plugins/openvswitch/ovs_neutron_plugin.ini
+rsync -a {{ env['VAULT'] }}/nova.conf              /etc/nova/nova.conf
+
+if [ -f /etc/neutron/plugin.ini ]; then
+    rm /etc/neutron/plugin.ini
+fi
+ln -s /etc/neutron/plugins/ml2/ml2_conf.ini /etc/neutron/plugin.ini
+
+if [ ! -f /etc/init.d/neutron-openvswitch-agent.orig ]; then
+    cp /etc/init.d/neutron-openvswitch-agent /etc/init.d/neutron-openvswitch-agent.orig
+    sed -i 's,plugins/openvswitch/ovs_neutron_plugin.ini,plugin.ini,g' /etc/init.d/neutron-openvswitch-agent
+fi

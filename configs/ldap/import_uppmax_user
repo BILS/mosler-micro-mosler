@@ -1,7 +1,0 @@
-#!/bin/sh
-
-. /etc/ldapcredentials
-
-sed -e 's/ou=People,dc=uppmax,dc=uu,dc=se/ou=Users,dc=mosler,dc=bils,dc=se/' | ldapadd  -h 127.0.0.1 -D cn=Manager,dc=mosler,dc=bils,dc=se -w"$MANAGERPASS"
-
-

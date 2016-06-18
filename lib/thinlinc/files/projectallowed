@@ -1,0 +1,39 @@
+#!/bin/sh
+
+KEYSTONETHREE=https://172.27.0.32:5000/v3
+
+echo 'Content-type: text/plain'
+remote=`echo $HTTP_COOKIE | sed -e 's/.*remote=//' -e 's/;.*//' `
+project=`echo $HTTP_COOKIE | sed -e 's/.*host=//' -e 's/;.*//' -e 's/\..*//'  `
+token=`echo $HTTP_COOKIE | sed -e 's/.*intoken=//' -e 's/;.*//' `
+
+if grep -q "^$remote\$" /var/lib/tl-auth/"$project" 2>/dev/null; then
+  # IP is okay for host.
+  echo 'Status: 200 OK'
+  echo
+  echo hej
+  exit 0
+fi
+
+username=`curl -s -H "Content-Type: application/json"  -d '{"auth":{"identity":{"methods": ["token"],"token":{"id": "'$token'"}}}}' "$KEYSTONETHREE/auth/tokens" | jq -r .token.user.name`
+
+echo "$username" "$host" "$remote"  >> /tmp/projectallowed
+
+if grep -iq  "^$project\$" /var/lib/tl-director/"$username" 2>/dev/null; then
+   echo "$remote" >> /var/lib/tl-auth/"$project"
+   echo 'Status: 200 OK'
+   echo
+   echo hej
+exit 0
+
+fi
+
+echo something is wrong "$remote" "$project" "$token" "$HTTP_COOKIE" >>/tmp/projectallowed
+echo Test: hej
+echo 'Status: 401 Unauthorized'
+echo
+echo
+echo No access to project "$project"
+exit 1
+
+

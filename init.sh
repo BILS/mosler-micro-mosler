@@ -39,19 +39,18 @@ while [ $# -gt 0 ]; do
 done
 
 
-#######################################################################
-# Logic to allow the user to specify some machines
-# Otherwise, continue with the ones in settings.sh
-mkdir -p ${INIT_TMP}
 # Create the host file first
-cat > ${INIT_TMP}/hosts <<ENDHOST
+cat > ${MM_TMP}/hosts <<ENDHOST
 127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
 ::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
 
 ENDHOST
-for name in "${MACHINES[@]}"; do echo "${MACHINE_IPs[$name]} $name" >> ${INIT_TMP}/hosts; done
-echo "${MACHINE_IPs[openstack-controller]} tos1" >> ${INIT_TMP}/hosts
+for name in "${MACHINES[@]}"; do echo "${MACHINE_IPs[$name]} $name" >> ${MM_TMP}/hosts; done
+echo "${MACHINE_IPs[openstack-controller]} tos1" >> ${MM_TMP}/hosts
 
+#######################################################################
+# Logic to allow the user to specify some machines
+# Otherwise, continue with the ones in settings.sh
 
 if [ -n ${CUSTOM_MACHINES:-''} ]; then
     CUSTOM_MACHINES_TMP=${CUSTOM_MACHINES//,/ } # replace all commas with space
@@ -76,6 +75,10 @@ if [ -n ${CUSTOM_MACHINES:-''} ]; then
 	exit 2
     fi  
 fi
+
+#######################################################################
+# Prepare the tmp folders
+for machine in ${MACHINES[@]}; do mkdir -p ${MM_TMP}/$machine/init; done
 
 #######################################################################
 
@@ -175,7 +178,7 @@ function boot_machine {
     local ip=${MACHINE_IPs[$machine]}
     local flavor=${FLAVORS[$machine]}
     
-    _VM_INIT=${INIT_TMP}/vm-$machine-$ip.sh
+    _VM_INIT=${MM_TMP}/$machine/init/vm.sh
     echo '#!/usr/bin/env bash' > ${_VM_INIT}
     for user in ${!PUBLIC_SSH_KEYS[@]}; do echo "echo '${PUBLIC_SSH_KEYS[$user]}' >> /home/centos/.ssh/authorized_keys" >> ${_VM_INIT}; done
     cat >> ${_VM_INIT} <<ENDCLOUDINIT
@@ -183,7 +186,7 @@ echo "==========================================================================
 echo "Creating hosts file"
 cat > /etc/hosts <<EOF
 ENDCLOUDINIT
-    cat ${INIT_TMP}/hosts >> ${_VM_INIT}
+    cat ${MM_TMP}/hosts >> ${_VM_INIT}
     cat >> ${_VM_INIT} <<ENDCLOUDINIT
 EOF
 chown root:root /etc/hosts

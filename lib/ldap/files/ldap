@@ -1,0 +1,9 @@
+#%PAM-1.0
+auth       sufficient   pam_exec.so expose_authtok quiet /usr/local/bin/ldapauth
+auth       sufficient   pam_exec.so expose_authtok quiet /usr/local/bin/pam_auth_token
+auth       required     pam_deny.so
+
+account    sufficient pam_permit.so
+password    required      pam_deny.so
+session sufficient pam_permit.so
+

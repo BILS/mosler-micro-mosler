@@ -1,0 +1,106 @@
+# -*-sh-*-
+
+echo "Configuring iptables"
+# Remove the line
+sed -i "/^-A INPUT -m state --state NEW -s {{ env['MGMT_CIDR']|replace('/','\/') }} -j ACCEPT/ d" /etc/sysconfig/iptables
+# Insert it before the other line
+sed -i "/^-A INPUT -m state --state NEW .*/ i \
+-A INPUT -m state --state NEW -s {{ env['MGMT_CIDR']|replace('/','\/') }} -j ACCEPT" /etc/sysconfig/iptables
+service iptables restart
+    
+
+##############################################################
+echo "Cron configuration"
+
+cat > /etc/cron.d/backup <<EOF
+MAILTO={{ env['MAILTO'] }}
+3 4 * * * root flock -n /tmp/backuprunning /usr/local/sbin/backup
+EOF
+
+cat > /etc/cron.d/filsluss <<EOF
+*/2 * * * * root flock -n /tmp/filsluss_import_run /usr/local/sbin/filsluss_cron_import 2>/dev/null >/dev/null 
+*/2 * * * * root flock -n /tmp/filsluss_export_run /usr/local/sbin/filsluss_cron_export 2>/dev/null >/dev/null
+EOF
+
+cat > /etc/cron.d/project_mapping <<EOF
+*/15 * * * * root /usr/local/sbin/thinlinc_proj_setup
+EOF
+
+cat > /etc/cron.d/queue <<EOF
+*/8 * * * * root flock -n /tmp/queue_responder /usr/local/bin/queue_responder
+EOF
+
+cat > /etc/cron.d/sync-uppmax <<EOF
+*/10 * * * * root test /tmp/syncexporters -nt /etc/uppmaxconfig/filsluss_exportmembers || flock -n /tmp/syncexporters /usr/local/bin/sync_exporters && touch /tmp/syncexporters
+*/10 * * * * root test /tmp/synctokenadmins -nt /etc/uppmaxconfig/bils_tokenadmins || flock -n /tmp/synctokenadmins /usr/local/bin/sync_tokenadmins && touch /tmp/synctokenadmins 
+*/10 * * * * root test /tmp/syncgrantfile -nt /etc/uppmaxconfig/grantfile || flock -n /tmp/syncgrantfile /usr/local/bin/sync_grantfile && touch /tmp/syncgrantfile
+
+2 2  * * * root flock  /tmp/syncexporters /usr/local/bin/sync_exporters 
+3 3  * * * root flock /tmp/synctokenadmins /usr/local/bin/sync_tokenadmins
+4 4 * * * root flock /tmp/syncgrantfile /usr/local/bin/sync_grantfile 
+EOF
+
+cat > /etc/cron.d/userdata <<EOF
+*/2 * * * * root flock -n /tmp/userdatarun /usr/local/sbin/fix_userdata 2>/dev/null
+* * * * * root flock -n /tmp/hostdatarun /usr/local/sbin/fix_hostdata 2>/dev/null
+EOF
+
+##############################################################
+
+# Wait 300 seconds max for neutron-server to be ready
+# Note: this should happen after keystone is ready
+sleep 5 # On the openstack-controller, neutron-server is first closing. Let's sleep
+wait_port openstack-controller 9696 300
+
+source /root/.keystonerc
+
+echo "Removing any 'public-net'"
+neutron net-list -F id -F name | awk '/ public-net / {print $2}' | while read netid; do neutron net-delete ${netid}; done
+
+echo 'Creating public network in neutron & updating the mosler-heat parameters'
+extnet=$(neutron net-create public-net --router:external True | awk '/ id / {print $4}')
+sed -i -e "s/__EXT_NET__/$extnet/"  /usr/local/heat/mosler-template-parameters
+
+echo "Creating public subnet network in neutron"
+neutron subnet-create public-net --name public-subnet --allocation-pool start=172.18.0.30,end=172.18.0.200 --disable-dhcp --gateway 172.18.0.1  172.18.0.0/24
+
+
+##############################################################
+# Create project NBIS. Users come from ldap.
+
+# Wait for the 3 glance images
+function wait_for_images {
+    local -i t=${1:-30} # default: 30 seconds, well...if you don't count the backoff...
+    local -i backoff=1
+    local -i stride=20
+    while (( t > 0 )) ; do
+	echo -e "Time left: $t"
+	ans=$(glance image-list | awk '/ active /' | wc -l)
+	[ "$ans" -eq 3 ] && return 0
+	(( t-=backoff ))
+	sleep $backoff
+        if (( (t % stride) == 0 )); then (( backoff*=2 )); fi
+    done
+    exit 1
+}
+wait_for_images 300
+
+function wait_for_flavors {
+    local -i t=${1:-30} # default: 30 seconds, well...if you don't count the backoff...
+    local -i backoff=1
+    local -i stride=20
+    while (( t > 0 )) ; do
+	echo -e "Time left: $t"
+	ans=$(nova flavor-list | awk '/ mosler\./' | wc -l)
+	[ "$ans" -eq 5 ] && return 0
+	(( t-=backoff ))
+	sleep $backoff
+        if (( (t % stride) == 0 )); then (( backoff*=2 )); fi
+    done
+    exit 1
+}
+wait_for_flavors 300
+
+if ! keystone tenant-get NBIS; then
+    /usr/local/bin/create_project.sh NBIS
+fi

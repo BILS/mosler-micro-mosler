@@ -1,0 +1,6 @@
+# -*-sh-*-
+
+echo "Installing NFS utils"
+yum -y install nfs-utils
+
+rsync -a {{ env['VAULT'] }}/getusers  /usr/local/sbin/getusers
