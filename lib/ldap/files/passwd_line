@@ -1,0 +1,15 @@
+#!/bin/sh
+
+. /root/ldapcred
+user="$1"
+
+line=""
+
+for p in uid IGNORE uidNumber gidNumber gecos homeDirectory loginShell; do
+
+new=`ldapsearch -LL -h 127.0.0.1 -D "$MANAGERDN" -w"$MANAGERPW" -b 'dc=mosler,dc=bils,dc=se'  uid="$user" | grep "^$p:" |sed -e "s/^$p:\s*//"`
+ 
+  line="$line:$new"
+done
+
+echo "$line" | sed -e 's/::/:*:/' | cut -c 2- | grep -v :::
