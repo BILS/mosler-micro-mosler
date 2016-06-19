@@ -66,6 +66,20 @@ neutron subnet-create public-net --name public-subnet --allocation-pool start=17
 
 
 ##############################################################
+# Mount the nfs share as /meles
+mkdir -p /meles
+if mount | grep -q meles ;then
+    umount /meles
+fi
+mount -t nfs {{ NFS_SERVER }}:/mnt/nfs /meles
+
+if ! grep -q '{{ NFS_SERVER }}' /etc/fstab; then
+    cat >> /etc/fstab<<EOF
+{{ NFS_SERVER }}:/mnt/nfs /meles  nfs   auto,noatime,nolock,bg,nfsvers=4,intr,tcp,actimeo=1800 0 0
+EOF
+fi
+
+##############################################################
 # Create project NBIS. Users come from ldap.
 
 # Wait for the 3 glance images

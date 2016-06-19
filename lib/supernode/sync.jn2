@@ -3,7 +3,7 @@
 #############################################################
 {% include 'openstack-common.jn2' %}
 
-yum -y install nc
+yum -y install nc nfs-utils
 
 #############################################################
 echo "Copying config files"

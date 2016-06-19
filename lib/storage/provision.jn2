@@ -1,4 +1,31 @@
 # -*-sh-*-
 
-echo "TO BE IMPLEMENTED"
+echo "Configuring iptables"
+# Remove the line
+sed -i "/^-A INPUT -m state --state NEW -s {{ env['MGMT_CIDR']|replace('/','\/') }} -j ACCEPT/ d" /etc/sysconfig/iptables
+# Insert it before the other line
+sed -i "/^-A INPUT -m state --state NEW .*/ i \
+-A INPUT -m state --state NEW -s {{ env['MGMT_CIDR']|replace('/','\/') }} -j ACCEPT" /etc/sysconfig/iptables
+service iptables restart
+
+echo "Configuring RPCBind and NFS"
+if ! grep -q rpcbind /etc/hosts.deny ; then
+    echo "rpcbind mountd nfsd statd lockd rquotad : ALL" >> /etc/hosts.deny
+fi
+
+if ! grep -q rpcbind /etc/hosts.allow ; then
+    echo "rpcbind mountd nfsd statd lockd rquotad : {{ env['MGMT_CIDR'] }}" >> /etc/hosts.allow
+fi
+
+chkconfig nfs on 
+service rpcbind restart
+service nfs restart
+
+echo "Creating NFS share"
+mkdir -p /mnt/nfs
+
+echo "/mnt/nfs {{ env['MGMT_CIDR'] }}(rw,sync,no_root_squash,no_subtree_check)" > /etc/exports
+#echo "/mnt/nfs supernode(rw,sync,no_root_squash,no_subtree_check)" > /etc/exports
+
+exportfs -a
 

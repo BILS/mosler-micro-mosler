@@ -16,7 +16,7 @@ This user must have the admin role for the given tenant/project. These
 settings will probably be given to you by your _openstack administrator_.
 
 The scripts define some variables (in `settings.sh`)
-* `MM_HOME` (that currently folder)
+* `MM_HOME` (that current folder)
 * `TL_HOME` (currently pointing to `/home/jonas/thinlinc`)
 * `MOSLER_IMAGES` (currently pointing to `/home/jonas/mosler-images`)
 

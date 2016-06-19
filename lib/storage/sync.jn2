@@ -1,5 +1,4 @@
 # -*-sh-*-
 
 echo "Installing NFS utils"
-yum -y install nfs-utils
-
+yum -y install nfs-utils nfs-utils-lib

@@ -99,6 +99,7 @@ FAIL=0
 reset_progress
 print_progress
 export DB_SERVER=${MACHINE_IPs[openstack-controller]} # Used in the templates
+export NFS_SERVER=${MACHINE_IPs[hnas-emulation]} # 
 
 # set -e # exit in errors
 # trap 'print_progress; oups "\a\nErrors found: Aborting"' ERR
@@ -160,3 +161,23 @@ if (( FAIL > 0 )); then
 else
     [ "$VERBOSE" = "yes" ] && thumb_up "\nServers configured"
 fi
+
+[ "$VERBOSE" = "yes" ] && echo "Generating SSH key pair for supernode"
+rm -rf ${MM_TMP}/ssh_key.${OS_TENANT_NAME} ${MM_TMP}/ssh_key.${OS_TENANT_NAME}.pub
+ssh-keygen -t rsa -N "" -f ${MM_TMP}/ssh_key.${OS_TENANT_NAME} -C supernode >/dev/null
+scp -q -F ${SSH_CONFIG} ${MM_TMP}/ssh_key.${OS_TENANT_NAME} ${FLOATING_IPs[supernode]}:${VAULT}/id_rsa
+for machine in ${MACHINES[@]}
+do
+    scp -q -F ${SSH_CONFIG} ${MM_TMP}/ssh_key.${OS_TENANT_NAME}.pub ${FLOATING_IPs[$machine]}:${VAULT}/id_rsa.pub
+done
+
+ssh -F ${SSH_CONFIG} ${FLOATING_IPs[supernode]} "sudo mv ${VAULT}/id_rsa ${VAULT}/id_rsa.pub /root/.ssh/."
+for machine in ${MACHINES[@]}
+do
+    [ $machine == "supernode" ] && continue
+    ssh -F ${SSH_CONFIG} ${FLOATING_IPs[$machine]} 'sudo bash -e -x 2>&1' <<EOF &>/dev/null
+sudo sed -i -e '/supernode/d' /root/.ssh/authorized_keys
+cat ${VAULT}/id_rsa.pub >> /root/.ssh/authorized_keys
+rm ${VAULT}/id_rsa.pub
+EOF
+done
