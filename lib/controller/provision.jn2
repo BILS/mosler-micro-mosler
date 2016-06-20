@@ -21,51 +21,6 @@ fi
 {% endfor %}
 
 #############################################################
-echo "Removing databases by hand"
-# Or check that: http://hakunin.com/six-ansible-practices#path-to-success-3
-rm -rf /var/lib/mysql
-mkdir --mode=0755 /var/lib/mysql
-chown mysql:mysql /var/lib/mysql
-
-echo "Create MySQL configuration file"
-cat > /etc/my.cnf <<EOF
-[mysqld]
-datadir=/var/lib/mysql
-socket=/var/lib/mysql/mysql.sock
-user=mysql
-# Disabling symbolic-links is recommended to prevent assorted security risks
-symbolic-links=0
-bind-address = {{ env['DB_SERVER'] }}
-default-storage-engine = innodb
-innodb_file_per_table
-collation-server = utf8_general_ci
-init-connect = 'SET NAMES utf8'
-character-set-server = utf8
-
-[mysqld_safe]
-log-error=/var/log/mysqld.log
-pid-file=/var/run/mysqld/mysqld.pid
-EOF
-
-echo "Restarting MySQL server"
-service mysqld start
-
-# echo "MySQL root password"
-# /usr/bin/mysqladmin -u root -h localhost password 'mysql'
-# /usr/bin/mysqladmin -u root -h openstack-controller password 'mysql'
-# # Not dropping the .my.cnf file in /root
-
-{% if env['DO_CHEAT'] == 'yes' %}
-echo "MySQL Databases setup (cheat)"
-mysql -u root < {{ env['VAULT'] }}/openstack_db_dump.sql
-service mysqld restart
-{% else %}
-echo "MySQL Databases setup"
-# Note: Root password is empty at first, then set inside openstack_db.sql.
-mysql -u root < {{ env['VAULT'] }}/openstack_db.sql
-{% endif %}
-
-#############################################################
 
 echo "Starting the Message Broker"
 service rabbitmq-server start
@@ -91,113 +46,50 @@ echo "Memcached service"
 service memcached restart
 chkconfig memcached on
 
-{% if env['DO_CHEAT'] == 'no' %}
-echo "Preparing the databases"
-su -s /bin/sh -c 'keystone-manage db_sync' keystone
-su -s /bin/sh -c 'glance-manage db_sync' glance
-su -s /bin/sh -c 'nova-manage db sync' nova
-su -s /bin/sh -c 'heat-manage db_sync' heat
-su -s /bin/sh -c 'neutron-db-manage --config-file /etc/neutron/neutron.conf  --config-file /etc/neutron/plugin.ini upgrade 5ac1c354a051' neutron
-{% endif %}
+#############################################################
+echo "MySQL configuration"
 
-# mysqldump -u root -pmysql --all-databases --events > {{ env['VAULT'] }}/openstack_db_dump.sql
+echo "Create MySQL configuration file"
+cat > /etc/my.cnf <<EOF
+[mysqld]
+datadir=/var/lib/mysql
+socket=/var/lib/mysql/mysql.sock
+user=mysql
+# Disabling symbolic-links is recommended to prevent assorted security risks
+symbolic-links=0
+bind-address = {{ env['DB_SERVER'] }}
+default-storage-engine = innodb
+innodb_file_per_table
+collation-server = utf8_general_ci
+init-connect = 'SET NAMES utf8'
+character-set-server = utf8
+
+[mysqld_safe]
+log-error=/var/log/mysqld.log
+pid-file=/var/run/mysqld/mysqld.pid
+EOF
+
+echo "Removing databases by hand"
+# Or check that: http://hakunin.com/six-ansible-practices#path-to-success-3
+rm -rf /var/lib/mysql
+mkdir --mode=0755 /var/lib/mysql
+chown mysql:mysql /var/lib/mysql
+
+echo "Restarting MySQL server"
+service mysqld start
+
+# echo "MySQL root password"
+# /usr/bin/mysqladmin -u root -h localhost password 'mysql'
+# /usr/bin/mysqladmin -u root -h openstack-controller password 'mysql'
+# # Not dropping the .my.cnf file in /root
+
+{% if env['DO_CHEAT'] == 'yes' %}
+{% include 'controller/provision-cheat.jn2' %}
+{% else %}
+{% include 'controller/provision-nocheat.jn2' %}
+# mysqldump -u root -pmysql --all-databases --events > /home/centos/vault/openstack_db_dump.sql
 # exit 0
-
-#wait for the ldap server
-#wait_for ldap ldap ready 300
-wait_port ldap 389 300
-
-echo "Keystone service"
-service openstack-keystone restart
-chkconfig openstack-keystone on
-
-export OS_SERVICE_TOKEN=0123456789abcdef0123456789abcdef
-export OS_SERVICE_ENDPOINT=http://openstack-controller:35357/v2.0
-
-echo "Keystone roles"
-keystone role-create --name=admin
-keystone role-create --name=service
-#keystone role-create --name=_member_ # already created by 'keystone-manage db_sync'
-
-echo "Keystone tenants"
-keystone tenant-create --name=admin --description='Admin Tenant'
-keystone tenant-create --name=services --description='Service Tenant'
-
-echo "Keystone roles attribution"
-keystone user-role-add --user=admin    --tenant=admin    --role=admin
-keystone user-role-add --user=admin    --tenant=admin    --role=_member_
-keystone user-role-add --user=keystone --tenant=services --role=admin
-keystone user-role-add --user=nova     --tenant=services --role=admin
-keystone user-role-add --user=neutron  --tenant=services --role=admin
-keystone user-role-add --user=glance   --tenant=services --role=admin
-keystone user-role-add --user=heat     --tenant=services --role=admin
-        
-echo "Keystone service creation"
-keystone service-create --name=keystone --type=identity       --description='OpenStack Identity'
-keystone service-create --name=glance   --type=image          --description='OpenStack Image Service'
-keystone service-create --name=nova     --type=compute        --description='OpenStack Compute'
-keystone service-create --name=neutron  --type=network        --description='OpenStack Networking'
-keystone service-create --name=heat     --type=orchestration  --description='Orchestration'
-keystone service-create --name=heat-cfn --type=cloudformation --description='Orchestration CloudFormation'
-
-
-echo "Keystone endpoints creation"
-## Service, Public, Internal, Admin
-{% set endpoints = [
-	('identity',       '5000/v2.0',               '5000/v2.0',               '35357/v2.0'              ),
-	('image',          '9292',                    '9292',                    '9292'                    ),
-	('compute',        '8774/v2/%\(tenant_id\)s', '8774/v2/%\(tenant_id\)s', '8774/v2/%\(tenant_id\)s' ),
-	('network',        '9696',                    '9696',                    '9696'                    ),
-	('orchestration',  '8004/v1/%\(tenant_id\)s', '8004/v1/%\(tenant_id\)s', '8004/v1/%\(tenant_id\)s' ),
-	('cloudformation', '8000/v1',                 '8000/v1',                 '8000/v1'                 )
-] -%}
-{% for service, public, internal, admin in endpoints %}
-keystone endpoint-create --service-id=$(keystone service-list | awk '/ {{ service }} / {print $2}') --publicurl=http://openstack-controller:{{ public }} --internalurl=http://openstack-controller:{{ internal }} --adminurl=http://openstack-controller:{{ admin }}
-{% endfor %}
-
-
-unset OS_SERVICE_TOKEN
-unset OS_SERVICE_ENDPOINT
-
-echo "Starting Openstack Services"
-{% set items = [ 'openstack-heat-api',
-		 'openstack-heat-api-cfn',
-		 'openstack-heat-engine',
-		 'openstack-nova-api',
-		 'openstack-nova-scheduler',
-		 'openstack-nova-conductor',
-		 'openstack-glance-api',
-		 'neutron-server',
-		 'openstack-glance-registry',
-		 'httpd'
-] -%}
-{% for service in items %}
-service {{ service }} restart 
-chkconfig {{ service }} on
-{% endfor %}
-
-echo "Removing any old image from Glance"
-rm -rf /var/lib/glance/images/*
-
-###############################################################
-source /root/.keystonerc
-
-echo "Adding the images to Glance"
-for i in {project-computenode-stable,project-loginnode-stable,topolino-q-stable}
-do
-    glance image-create --file {{ env['VAULT'] }}/$i --disk-format qcow2 --container-format bare  --name "$i" --is-public True
-done
-
-echo "Removing existing Mosler flavors"
-nova flavor-list | awk '/ mosler\./ {print $2}' | while read flavor; do nova flavor-delete $flavor; done
-
-echo "Adding Mosler flavors"
-nova flavor-create mosler.1core   auto 500 10 1
-nova flavor-create mosler.2cores  auto 500 10 1
-nova flavor-create mosler.4cores  auto 500 10 1
-nova flavor-create mosler.8cores  auto 500 10 1
-nova flavor-create mosler.16cores auto 500 10 1
-
+{% endif %}
 
 echo "Cron configuration"
 # rsync -a {{ env['VAULT'] }}/token_flush_cron         /usr/local/sbin/token_flush_cron
@@ -217,7 +109,21 @@ cat > /etc/cron.d/update_user_password <<EOF
 */5 * * * * root /root/update_user_password.py
 EOF
 
+source /root/.keystonerc
+function wait_for_compute1 {
+    local -i t=${1:-30} # default: 30 seconds, well...if you don't count the backoff...
+    local -i backoff=1
+    local -i stride=20
+    while (( t > 0 )) ; do
+	echo -e "Time left: $t"
+	if nova host-list | grep -q compute1.novalocal; then return 0; fi
+	(( t-=backoff ))
+	sleep $backoff
+        if (( (t % stride) == 0 )); then (( backoff*=2 )); fi
+    done
+    exit 1
+}
+wait_for_compute1 300
 
-exit 0 # Exiting early today
-nova aggregate-create service-and-login serv-login
 nova aggregate-add-host service-and-login compute1.novalocal
+

@@ -47,6 +47,7 @@ cat > ${MM_TMP}/hosts <<ENDHOST
 ENDHOST
 for name in "${MACHINES[@]}"; do echo "${MACHINE_IPs[$name]} $name" >> ${MM_TMP}/hosts; done
 echo "${MACHINE_IPs[openstack-controller]} tos1" >> ${MM_TMP}/hosts
+echo "${MACHINE_IPs[hnas-emulation]} meles-smu" >> ${MM_TMP}/hosts
 
 #######################################################################
 # Logic to allow the user to specify some machines

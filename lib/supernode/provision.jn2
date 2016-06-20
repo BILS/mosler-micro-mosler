@@ -12,11 +12,6 @@ service iptables restart
 ##############################################################
 echo "Cron configuration"
 
-cat > /etc/cron.d/backup <<EOF
-MAILTO={{ env['MAILTO'] }}
-3 4 * * * root flock -n /tmp/backuprunning /usr/local/sbin/backup
-EOF
-
 cat > /etc/cron.d/filsluss <<EOF
 */2 * * * * root flock -n /tmp/filsluss_import_run /usr/local/sbin/filsluss_cron_import 2>/dev/null >/dev/null 
 */2 * * * * root flock -n /tmp/filsluss_export_run /usr/local/sbin/filsluss_cron_export 2>/dev/null >/dev/null
@@ -59,7 +54,10 @@ neutron net-list -F id -F name | awk '/ public-net / {print $2}' | while read ne
 
 echo 'Creating public network in neutron & updating the mosler-heat parameters'
 extnet=$(neutron net-create public-net --router:external True | awk '/ id / {print $4}')
-sed -i -e "s/__EXT_NET__/$extnet/"  /usr/local/heat/mosler-template-parameters
+# rsync -a {{ env['VAULT'] }}/mosler-template-parameters /usr/local/heat/mosler-template-parameters
+# sed -i -e "s/__EXT_NET__/$extnet/"  /usr/local/heat/mosler-template-parameters
+sed -e "s/__EXT_NET__/$extnet/" {{ env['VAULT'] }}/mosler-template-parameters > /usr/local/heat/mosler-template-parameters
+chmod 0755 /usr/local/heat/mosler-template-parameters
 
 echo "Creating public subnet network in neutron"
 neutron subnet-create public-net --name public-subnet --allocation-pool start=172.18.0.30,end=172.18.0.200 --disable-dhcp --gateway 172.18.0.1  172.18.0.0/24
@@ -71,11 +69,11 @@ mkdir -p /meles
 if mount | grep -q meles ;then
     umount /meles
 fi
-mount -t nfs {{ NFS_SERVER }}:/mnt/nfs /meles
+mount -t nfs {{ env['NFS_SERVER'] }}:/mnt/nfs /meles
 
-if ! grep -q '{{ NFS_SERVER }}' /etc/fstab; then
+if ! grep -q "{{ env['NFS_SERVER'] }}" /etc/fstab; then
     cat >> /etc/fstab<<EOF
-{{ NFS_SERVER }}:/mnt/nfs /meles  nfs   auto,noatime,nolock,bg,nfsvers=4,intr,tcp,actimeo=1800 0 0
+{{ env['NFS_SERVER'] }}:/mnt/nfs /meles  nfs   auto,noatime,nolock,bg,nfsvers=4,intr,tcp,actimeo=1800 0 0
 EOF
 fi
 

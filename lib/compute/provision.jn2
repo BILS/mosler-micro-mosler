@@ -24,7 +24,7 @@ sed -i -e 's/{{ regexp }}/{{ line }}/' /etc/sysctl.conf
 {% endfor %}
 
 echo "Starting OpenVSwitch"
-service openvswitch start
+service openvswitch restart
 chkconfig openvswitch on
     
 echo "Creating the OVS bridge"
@@ -34,10 +34,10 @@ echo "Adding eth1 to the OVS bridge"
 ovs-vsctl add-port br-eth1 eth1 || true
 
 echo "Starting Nova and Neutron agents"
-service libvirtd start
-service messagebus start
-service openstack-nova-compute start
-service neutron-openvswitch-agent start
+service libvirtd restart
+service messagebus restart
+service openstack-nova-compute restart
+service neutron-openvswitch-agent restart
 
 chkconfig libvirtd on
 chkconfig messagebus on

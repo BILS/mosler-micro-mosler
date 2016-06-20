@@ -126,7 +126,7 @@ do
                                  .render(env=os.environ))" \
 		   <${FOLDER}/sync.jn2 \
 		   >${_SCRIPT}
-	    ssh -F ${SSH_CONFIG} ${FLOATING_IPs[$machine]} 'sudo bash -e -x -v 2>&1' <${_SCRIPT}
+	    ssh -F ${SSH_CONFIG} ${FLOATING_IPs[$machine]} 'sudo bash -e -x 2>&1' <${_SCRIPT}
 	)
 	RET=$?
 	if [ $RET -eq 0 ]; then report_ok $machine; else report_fail $machine; fi

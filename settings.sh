@@ -132,9 +132,6 @@ export PROVISION=(\
 )
 
 ########################################
-export MAILTO=jonas.hagberg@bils.se
-
-########################################
 export SSH_CONFIG=${MM_TMP}/ssh_config.${OS_TENANT_NAME}
 function mm_connect {
     local host=$1

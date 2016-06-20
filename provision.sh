@@ -17,8 +17,6 @@ function usage {
     echo -e "\t                       \tWe filter out machines that don't appear in the default list."
     echo -e "\t--vault <name>         \tName of the drop folder in the servers"
     echo -e "\t                       \tDefaults to '${VAULT}'"
-    echo -e "\t--mail-to <email>      \tContact email for the cron jobs"
-    echo -e "\t                       \tDefaults to '${MAILTO}'"
     echo -e "\t--timeout <seconds>,   \tSkips the steps of syncing files to the servers"
     echo -e "\t       -t <seconds>    \tSkips the steps of syncing files to the servers"
     echo -e "\t--cheat                \tUses tricks to provision machines faster (like mysql pre-dumps)"
@@ -35,7 +33,6 @@ while [ $# -gt 0 ]; do
         --machines|-m) CUSTOM_MACHINES=$2; shift;;
         --cheat) DO_CHEAT=yes;;
         --vault) VAULT=$2; shift;;
-        --mail-to) MAILTO=$2; shift;;
         --timeout|-t) CONNECTION_TIMEOUT=$2; shift;;
         --) shift; break;;
         *) echo "$0: error - unrecognized option $1" 1>&2; usage; exit 1;;
@@ -94,7 +91,7 @@ trap 'cleanup' INT TERM #EXIT #HUP ERR
 #######################################################################
 # Aaaaannnnnddd...... cue music!
 ########################################################################
-[ "$VERBOSE" = "yes" ] && echo -e "\nConfiguring servers:"
+[ "$VERBOSE" = "yes" ] && echo -e "Configuring servers:"
 FAIL=0
 reset_progress
 print_progress
@@ -163,8 +160,8 @@ else
 fi
 
 [ "$VERBOSE" = "yes" ] && echo "Generating SSH key pair for supernode"
-rm -rf ${MM_TMP}/ssh_key.${OS_TENANT_NAME} ${MM_TMP}/ssh_key.${OS_TENANT_NAME}.pub
-ssh-keygen -t rsa -N "" -f ${MM_TMP}/ssh_key.${OS_TENANT_NAME} -C supernode >/dev/null
+rm -f ${MM_TMP}/ssh_key.${OS_TENANT_NAME} ${MM_TMP}/ssh_key.${OS_TENANT_NAME}.pub
+ssh-keygen -q -t rsa -N "micromosler" -f ${MM_TMP}/ssh_key.${OS_TENANT_NAME} -C supernode
 scp -q -F ${SSH_CONFIG} ${MM_TMP}/ssh_key.${OS_TENANT_NAME} ${FLOATING_IPs[supernode]}:${VAULT}/id_rsa
 for machine in ${MACHINES[@]}
 do
@@ -174,7 +171,7 @@ done
 ssh -F ${SSH_CONFIG} ${FLOATING_IPs[supernode]} "sudo mv ${VAULT}/id_rsa ${VAULT}/id_rsa.pub /root/.ssh/."
 for machine in ${MACHINES[@]}
 do
-    [ $machine == "supernode" ] && continue
+    [ "$machine" == "supernode" ] && continue
     ssh -F ${SSH_CONFIG} ${FLOATING_IPs[$machine]} 'sudo bash -e -x 2>&1' <<EOF &>/dev/null
 sudo sed -i -e '/supernode/d' /root/.ssh/authorized_keys
 cat ${VAULT}/id_rsa.pub >> /root/.ssh/authorized_keys

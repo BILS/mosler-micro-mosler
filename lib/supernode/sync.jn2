@@ -58,9 +58,10 @@ mkdir -p /usr/local/heat
 		 'mosler-template-resources-secgroups',
 		 'mosler-template-resources-loginnode',
 		 'mosler-template-resources-servicenode',
-		 'mosler-template-parameters'
 	       ] -%}
 {% for file in files %}
 rsync -a {{ env['VAULT'] }}/{{ file }} /usr/local/heat/{{ file }}
 chmod 0755 /usr/local/heat/{{ file }}
 {% endfor %}
+
+{# 'mosler-template-parameters' #}

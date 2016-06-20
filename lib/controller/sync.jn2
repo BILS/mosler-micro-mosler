@@ -38,4 +38,4 @@ rsync -a {{ env['VAULT'] }}/local_settings           /etc/openstack-dashboard/lo
 if [ -f /etc/neutron/plugin.ini ]; then
     rm /etc/neutron/plugin.ini
 fi
-ln -s /etc/neutron/plugins/ml2/ml2_conf.ini /etc/neutron/plugin.ini
+ln -s /etc/neutron/plugins/ml2/ml2.ini /etc/neutron/plugin.ini

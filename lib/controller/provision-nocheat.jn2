@@ -1,0 +1,122 @@
+# -*-sh-*-
+
+echo "Removing Glance by hand"
+rm -rf /var/lib/glance/*
+
+echo "MySQL Databases setup"
+# Note: Root password is empty at first, then set inside openstack_db.sql.
+mysql -u root < {{ env['VAULT'] }}/openstack_db.sql
+
+echo "Preparing the databases"
+su -s /bin/sh -c 'keystone-manage db_sync' keystone
+su -s /bin/sh -c 'glance-manage db_sync' glance
+su -s /bin/sh -c 'nova-manage db sync' nova
+su -s /bin/sh -c 'heat-manage db_sync' heat
+su -s /bin/sh -c 'neutron-db-manage --config-file /etc/neutron/neutron.conf  --config-file /etc/neutron/plugin.ini upgrade 5ac1c354a051' neutron
+
+#wait for the ldap server
+#wait_for ldap ldap ready 300
+wait_port ldap 389 300
+
+echo "Keystone service"
+service openstack-keystone restart
+chkconfig openstack-keystone on
+
+export OS_SERVICE_TOKEN=0123456789abcdef0123456789abcdef
+export OS_SERVICE_ENDPOINT=http://openstack-controller:35357/v2.0
+
+echo "Keystone roles"
+keystone role-create --name=admin
+keystone role-create --name=service
+#keystone role-create --name=_member_ # already created by 'keystone-manage db_sync'
+
+echo "Keystone tenants"
+keystone tenant-create --name=admin --description='Admin Tenant'
+keystone tenant-create --name=services --description='Service Tenant'
+
+echo "Keystone roles attribution"
+keystone user-role-add --user=admin    --tenant=admin    --role=admin
+keystone user-role-add --user=admin    --tenant=admin    --role=_member_
+keystone user-role-add --user=keystone --tenant=services --role=admin
+keystone user-role-add --user=nova     --tenant=services --role=admin
+keystone user-role-add --user=neutron  --tenant=services --role=admin
+keystone user-role-add --user=glance   --tenant=services --role=admin
+keystone user-role-add --user=heat     --tenant=services --role=admin
+        
+echo "Keystone service creation"
+keystone service-create --name=keystone --type=identity       --description='OpenStack Identity'
+keystone service-create --name=glance   --type=image          --description='OpenStack Image Service'
+keystone service-create --name=nova     --type=compute        --description='OpenStack Compute'
+keystone service-create --name=neutron  --type=network        --description='OpenStack Networking'
+keystone service-create --name=heat     --type=orchestration  --description='Orchestration'
+keystone service-create --name=heat-cfn --type=cloudformation --description='Orchestration CloudFormation'
+
+
+echo "Keystone endpoints creation"
+## Service, Public, Internal, Admin
+{% set endpoints = [
+	('identity',       '5000/v2.0',               '5000/v2.0',               '35357/v2.0'              ),
+	('image',          '9292',                    '9292',                    '9292'                    ),
+	('compute',        '8774/v2/%\(tenant_id\)s', '8774/v2/%\(tenant_id\)s', '8774/v2/%\(tenant_id\)s' ),
+	('network',        '9696',                    '9696',                    '9696'                    ),
+	('orchestration',  '8004/v1/%\(tenant_id\)s', '8004/v1/%\(tenant_id\)s', '8004/v1/%\(tenant_id\)s' ),
+	('cloudformation', '8000/v1',                 '8000/v1',                 '8000/v1'                 )
+] -%}
+{% for service, public, internal, admin in endpoints %}
+keystone endpoint-create --service-id=$(keystone service-list | awk '/ {{ service }} / {print $2}') --publicurl=http://openstack-controller:{{ public }} --internalurl=http://openstack-controller:{{ internal }} --adminurl=http://openstack-controller:{{ admin }}
+{% endfor %}
+
+unset OS_SERVICE_TOKEN
+unset OS_SERVICE_ENDPOINT
+
+echo "Starting Openstack Services"
+{% set items = [ 'openstack-heat-api',
+		 'openstack-heat-api-cfn',
+		 'openstack-heat-engine',
+		 'openstack-nova-api',
+		 'openstack-nova-scheduler',
+		 'openstack-nova-conductor',
+		 'openstack-glance-api',
+		 'neutron-server',
+		 'openstack-glance-registry',
+		 'httpd'
+] -%}
+{% for service in items %}
+service {{ service }} restart 
+chkconfig {{ service }} on
+{% endfor %}
+
+###############################################################
+source /root/.keystonerc
+
+echo "Adding the images to Glance"
+IMG=([1]=project-computenode-stable \
+     [2]=project-loginnode-stable \
+     [3]=topolino-q-stable)
+for i in {1..3}
+do
+    img=00000000-0000-0000-0000-00000000000$i
+    glance image-create \
+           --id $img \
+           --name "${IMG[$i]}" \
+           --file {{ env['VAULT'] }}/${IMG[$i]} \
+           --disk-format qcow2 --container-format bare --is-public True
+    # Saving space
+    rm -f $img
+    ln -s /home/centos/{{ env['VAULT'] }}/${IMG[$i]} $img
+    chown glance:glance $img
+    chmod 640 $img
+done
+
+echo "Removing existing Mosler flavors"
+nova flavor-list | awk '/ mosler\./ {print $2}' | while read flavor; do nova flavor-delete $flavor; done
+
+echo "Adding Mosler flavors"
+nova flavor-create mosler.1core   auto 500 10 1
+nova flavor-create mosler.2cores  auto 500 10 1
+nova flavor-create mosler.4cores  auto 500 10 1
+nova flavor-create mosler.8cores  auto 500 10 1
+nova flavor-create mosler.16cores auto 500 10 1
+
+echo "Adding availability zone and aggregate"
+nova aggregate-create service-and-login serv-login

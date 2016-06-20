@@ -17,7 +17,7 @@ rsync -a {{ env['VAULT'] }}/ovs_neutron_plugin.ini /etc/neutron/plugins/openvswi
 if [ -f /etc/neutron/plugin.ini ]; then
     rm /etc/neutron/plugin.ini
 fi
-ln -s /etc/neutron/plugins/ml2/ml2_conf.ini /etc/neutron/plugin.ini
+ln -s /etc/neutron/plugins/ml2/ml2.ini /etc/neutron/plugin.ini
 
 if [ ! -f /etc/init.d/neutron-openvswitch-agent.orig ]; then
     cp /etc/init.d/neutron-openvswitch-agent /etc/init.d/neutron-openvswitch-agent.orig
