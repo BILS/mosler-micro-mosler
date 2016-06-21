@@ -41,6 +41,6 @@ echo "Starting Neutron services"
 		    'ovs-cleanup'
 ] -%}
 {% for service in services %}
-service neutron-{{ service }} start
+service neutron-{{ service }} restart
 chkconfig neutron-{{ service }} on
 {% endfor %}

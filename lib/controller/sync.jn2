@@ -26,14 +26,36 @@ do
 done
 
 echo "Copying config files"
-rsync -a {{ env['VAULT'] }}/neutron.conf             /etc/neutron/neutron.conf
-rsync -a {{ env['VAULT'] }}/keystone.conf            /etc/keystone/keystone.conf
-rsync -a {{ env['VAULT'] }}/ml2.ini                  /etc/neutron/plugins/ml2/ml2.ini
-rsync -a {{ env['VAULT'] }}/nova.conf                /etc/nova/nova.conf
-rsync -a {{ env['VAULT'] }}/glance-api.conf          /etc/glance/glance-api.conf
-rsync -a {{ env['VAULT'] }}/glance-registry.conf     /etc/glance/glance-registry.conf
-rsync -a {{ env['VAULT'] }}/heat.conf                /etc/heat/heat.conf
-rsync -a {{ env['VAULT'] }}/local_settings           /etc/openstack-dashboard/local_settings
+rsync -a --no-perms {{ env['VAULT'] }}/keystone.conf            /etc/keystone/keystone.conf
+chown keystone:keystone /etc/keystone/keystone.conf
+chmod 644 /etc/keystone/keystone.conf
+
+rsync -a --no-perms {{ env['VAULT'] }}/neutron.conf             /etc/neutron/neutron.conf
+chown neutron:neutron /etc/neutron/neutron.conf
+chmod 644 /etc/neutron/neutron.conf
+
+rsync -a --no-perms {{ env['VAULT'] }}/ml2.ini                  /etc/neutron/plugins/ml2/ml2.ini
+chown neutron:neutron /etc/neutron/plugins/ml2/ml2.ini
+chmod 644 /etc/neutron/plugins/ml2/ml2.ini
+
+rsync -a --no-perms {{ env['VAULT'] }}/nova.conf                /etc/nova/nova.conf
+chown nova:nova /etc/nova/nova.conf
+chmod 644 /etc/nova/nova.conf
+
+rsync -a --no-perms {{ env['VAULT'] }}/glance-api.conf           /etc/glance/glance-api.conf
+chown glance:glance /etc/glance/glance-api.conf
+chmod 644 /etc/glance/glance-api.conf
+
+rsync -a --no-perms {{ env['VAULT'] }}/glance-registry.conf      /etc/glance/glance-registry.conf
+chown glance:glance /etc/glance/glance-registry.conf
+chmod 644 /etc/glance/glance-registry.conf
+
+rsync -a --no-perms {{ env['VAULT'] }}/heat.conf                /etc/heat/heat.conf
+chown heat:heat /etc/heat/heat.conf
+chmod 644 /etc/heat/heat.conf
+
+rsync -a --no-perms {{ env['VAULT'] }}/local_settings           /etc/openstack-dashboard/local_settings
+
 
 if [ -f /etc/neutron/plugin.ini ]; then
     rm /etc/neutron/plugin.ini

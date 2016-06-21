@@ -7,6 +7,7 @@ source $HERE/settings.sh
 export VAULT=vault
 CONNECTION_TIMEOUT=1 #seconds
 export DO_CHEAT=no
+WITH_KEY=yes
 
 function usage {
     echo "Usage: $0 [options]"
@@ -34,6 +35,7 @@ while [ $# -gt 0 ]; do
         --cheat) DO_CHEAT=yes;;
         --vault) VAULT=$2; shift;;
         --timeout|-t) CONNECTION_TIMEOUT=$2; shift;;
+        --no-key) WITH_KEY=no;;
         --) shift; break;;
         *) echo "$0: error - unrecognized option $1" 1>&2; usage; exit 1;;
     esac
@@ -57,12 +59,8 @@ if [ -n ${CUSTOM_MACHINES:-''} ]; then
     done
     MACHINES=(${CUSTOM_MACHINES})
 
-    if [ ${#MACHINES[@]} -eq 0 ]; then
-	echo "Nothing to be done. Exiting..."
-	exit 2
-    else
-	[ "$VERBOSE" = "yes" ] && echo "Using these machines: ${CUSTOM_MACHINES// /,}"
-    fi
+    [ "$VERBOSE" = "yes" ] && echo "Using these machines: ${CUSTOM_MACHINES// /,}"
+
 fi
 
 #######################################################################
@@ -76,6 +74,11 @@ source $LIB/utils.sh
 
 #######################################################################
 source $LIB/ssh_connections.sh
+
+if [ ${#MACHINES[@]} -eq 0 ]; then
+    echo "Nothing to be done. Exiting..."
+    exit 2 # or 0?
+fi
 
 #######################################################################
 
@@ -160,22 +163,25 @@ else
     [ "$VERBOSE" = "yes" ] && thumb_up "\nServers configured"
 fi
 
-[ "$VERBOSE" = "yes" ] && echo "Generating SSH key pair for supernode"
-rm -f ${MM_TMP}/ssh_key.${OS_TENANT_NAME} ${MM_TMP}/ssh_key.${OS_TENANT_NAME}.pub
-ssh-keygen -q -t rsa -N "micromosler" -f ${MM_TMP}/ssh_key.${OS_TENANT_NAME} -C supernode
-scp -q -F ${SSH_CONFIG} ${MM_TMP}/ssh_key.${OS_TENANT_NAME} ${FLOATING_IPs[supernode]}:${VAULT}/id_rsa
-for machine in ${MACHINES[@]}
-do
-    scp -q -F ${SSH_CONFIG} ${MM_TMP}/ssh_key.${OS_TENANT_NAME}.pub ${FLOATING_IPs[$machine]}:${VAULT}/id_rsa.pub
-done
+if [ $WITH_KEY = yes ]; then
+    [ "$VERBOSE" = "yes" ] && echo "Generating SSH key pair for supernode"
+    rm -f ${MM_TMP}/ssh_key.${OS_TENANT_NAME} ${MM_TMP}/ssh_key.${OS_TENANT_NAME}.pub
+    ssh-keygen -q -t rsa -N "micromosler" -f ${MM_TMP}/ssh_key.${OS_TENANT_NAME} -C supernode
+    scp -q -F ${SSH_CONFIG} ${MM_TMP}/ssh_key.${OS_TENANT_NAME} ${FLOATING_IPs[supernode]}:${VAULT}/id_rsa
+    for machine in ${MACHINES[@]}
+    do
+	scp -q -F ${SSH_CONFIG} ${MM_TMP}/ssh_key.${OS_TENANT_NAME}.pub ${FLOATING_IPs[$machine]}:${VAULT}/id_rsa.pub
+    done
 
-ssh -F ${SSH_CONFIG} ${FLOATING_IPs[supernode]} "sudo mv ${VAULT}/id_rsa ${VAULT}/id_rsa.pub /root/.ssh/."
-for machine in ${MACHINES[@]}
-do
-    [ "$machine" == "supernode" ] && continue
-    ssh -F ${SSH_CONFIG} ${FLOATING_IPs[$machine]} 'sudo bash -e -x 2>&1' <<EOF &>/dev/null
+    ssh -F ${SSH_CONFIG} ${FLOATING_IPs[supernode]} "sudo mv ${VAULT}/id_rsa ${VAULT}/id_rsa.pub /root/.ssh/."
+    for machine in ${MACHINES[@]}
+    do
+	[ "$machine" == "supernode" ] && continue
+	ssh -F ${SSH_CONFIG} ${FLOATING_IPs[$machine]} 'sudo bash -e -x 2>&1' <<EOF &>/dev/null
 sudo sed -i -e '/supernode/d' /root/.ssh/authorized_keys
 cat ${VAULT}/id_rsa.pub >> /root/.ssh/authorized_keys
 rm ${VAULT}/id_rsa.pub
 EOF
-done
+    done
+
+fi

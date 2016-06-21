@@ -54,12 +54,8 @@ if [ -n ${CUSTOM_MACHINES:-''} ]; then
     done
     MACHINES=(${CUSTOM_MACHINES})
 
-    if [ ${#MACHINES[@]} -eq 0 ]; then
-	echo "Nothing to be done. Exiting..."
-	exit 2
-    else
-	[ "$VERBOSE" = "yes" ] && echo "Using these machines: ${CUSTOM_MACHINES// /,}"
-    fi
+    [ "$VERBOSE" = "yes" ] && echo "Using these machines: ${CUSTOM_MACHINES// /,}"
+
 fi
 
 #######################################################################
@@ -73,6 +69,11 @@ source $LIB/utils.sh
 
 #######################################################################
 source $LIB/ssh_connections.sh
+
+if [ ${#MACHINES[@]} -eq 0 ]; then
+    echo "Nothing to be done. Exiting..."
+    exit 2 # or 0?
+fi
 
 #######################################################################
 

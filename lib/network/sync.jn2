@@ -6,13 +6,28 @@
 #############################################################
 
 echo "Openstack Components"
-yum -y install openstack-neutron openstack-neutron-ml2 openstack-neutron-openvswitch
+yum -y install openstack-neutron openstack-neutron-ml2 openstack-neutron-openvswitch iproute
 
 #############################################################
 echo "Copying config files"
-rsync -a {{ env['VAULT'] }}/neutron.conf           /etc/neutron/neutron.conf
-rsync -a {{ env['VAULT'] }}/ml2.ini                /etc/neutron/plugins/ml2/ml2.ini
-rsync -a {{ env['VAULT'] }}/ovs_neutron_plugin.ini /etc/neutron/plugins/openvswitch/ovs_neutron_plugin.ini
+
+declare -A FILES
+FILES=(\
+['neutron.conf']='/etc/neutron/neutron.conf' \
+['ml2.ini']='/etc/neutron/plugins/ml2/ml2.ini' \
+['ovs_neutron_plugin.ini']='/etc/neutron/plugins/openvswitch/ovs_neutron_plugin.ini' \
+['l3_agent.ini']='/etc/neutron/l3_agent.ini' \
+['dhcp_agent.ini']='/etc/neutron/dhcp_agent.ini' \
+['dnsmasq-neutron.conf']='/etc/neutron/dnsmasq-neutron.conf' \
+)
+
+for f in ${!FILES[@]}
+do
+    rsync -a --no-perms {{ env['VAULT'] }}/$f ${FILES[$f]}
+    chown neutron:neutron ${FILES[$f]}
+    chmod 644 ${FILES[$f]}
+done
+
 
 if [ -f /etc/neutron/plugin.ini ]; then
     rm /etc/neutron/plugin.ini

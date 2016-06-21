@@ -9,10 +9,22 @@ echo "Openstack Components"
 yum -y install openstack-nova-compute openstack-neutron-ml2 openstack-neutron-openvswitch
 
 echo "Copying config files"
-rsync -a {{ env['VAULT'] }}/neutron.conf           /etc/neutron/neutron.conf
-rsync -a {{ env['VAULT'] }}/ml2.ini                /etc/neutron/plugins/ml2/ml2.ini
-rsync -a {{ env['VAULT'] }}/ovs_neutron_plugin.ini /etc/neutron/plugins/openvswitch/ovs_neutron_plugin.ini
-rsync -a {{ env['VAULT'] }}/nova.conf              /etc/nova/nova.conf
+rsync -a --no-perms {{ env['VAULT'] }}/nova.conf                /etc/nova/nova.conf
+chown nova:nova /etc/nova/nova.conf
+chmod 644 /etc/nova/nova.conf
+
+rsync -a --no-perms {{ env['VAULT'] }}/neutron.conf             /etc/neutron/neutron.conf
+chown neutron:neutron /etc/neutron/neutron.conf
+chmod 644 /etc/neutron/neutron.conf
+
+rsync -a --no-perms {{ env['VAULT'] }}/ml2.ini                  /etc/neutron/plugins/ml2/ml2.ini
+chown neutron:neutron /etc/neutron/plugins/ml2/ml2.ini
+chmod 644 /etc/neutron/plugins/ml2/ml2.ini
+
+rsync -a --no-perms {{ env['VAULT'] }}/ovs_neutron_plugin.ini   /etc/neutron/plugins/openvswitch/ovs_neutron_plugin.ini
+chown neutron:neutron /etc/neutron/plugins/openvswitch/ovs_neutron_plugin.ini
+chmod 644 /etc/neutron/plugins/openvswitch/ovs_neutron_plugin.ini
+
 
 if [ -f /etc/neutron/plugin.ini ]; then
     rm /etc/neutron/plugin.ini
