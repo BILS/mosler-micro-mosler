@@ -45,7 +45,7 @@ cat > ${MM_TMP}/hosts <<ENDHOST
 ::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
 
 ENDHOST
-for name in "${MACHINES[@]}"; do echo "${MACHINE_IPs[$name]} $name" >> ${MM_TMP}/hosts; done
+for name in ${MACHINES[@]}; do echo "${MACHINE_IPs[$name]} $name" >> ${MM_TMP}/hosts; done
 echo "${MACHINE_IPs[openstack-controller]} tos1" >> ${MM_TMP}/hosts
 echo "${MACHINE_IPs[hnas-emulation]} meles-smu" >> ${MM_TMP}/hosts
 
@@ -126,7 +126,7 @@ if [ ${_ALL} = "yes" ]; then
     
 
     [ "$VERBOSE" = "yes" ] && echo "Creating the floating IPs"
-    for machine in "${MACHINES[@]}"; do
+    for machine in ${MACHINES[@]}; do
 	neutron floatingip-create --tenant-id ${TENANT_ID} --floating-ip-address ${FLOATING_IPs[$machine]} public
     done
 
@@ -159,7 +159,7 @@ DATA_NET=$(neutron net-list --tenant_id=${TENANT_ID} | awk '/ '${OS_TENANT_NAME}
 
 [ "$VERBOSE" = "yes" ] && echo -e "Management Net: $MGMT_NET\nData Net: $DATA_NET"
 
-if [ -z $MGMT_NET ] || [ -z $DATA_NET ]; then
+if [ -z "$MGMT_NET" ] || [ -z "$DATA_NET" ]; then
     echo "Error: Could not find the Management or Data network"
     echo -e "\tMaybe you should re-run with the --all flags?"
     exit 1
@@ -199,7 +199,7 @@ echo 'Europe/Stockholm' > /etc/timezone
 ENDCLOUDINIT
 
     # If Data IP is not zero-length
-    if [ ! -z ${DATA_IPs[$machine]} ]; then
+    if [ ! -z "${DATA_IPs[$machine]}" ]; then
 	local DN="--nic net-id=$DATA_NET,v4-fixed-ip=${DATA_IPs[$machine]}"
 	# Note: I think I could add those routes to the DHCP server
 	# Neutron will then configure these settings automatically
@@ -270,7 +270,7 @@ $machine 2>&1 > /dev/null
 # Aaaaannndddd....cue music!
 ########################################################################
 [ "$VERBOSE" = "yes" ] && echo "Booting the machines"
-for machine in "${MACHINES[@]}"; do boot_machine $machine; done
+for machine in ${MACHINES[@]}; do boot_machine $machine; done
 
 ########################################################################
 [ "$VERBOSE" = "yes" ] && echo "Waiting for the REST phone home server (PID: ${REST_PID})"
@@ -279,7 +279,7 @@ wait ${REST_PID}
 
 ########################################################################
 [ "$VERBOSE" = "yes" ] && echo -e "Associating floating IPs"
-for machine in "${MACHINES[@]}"
+for machine in ${MACHINES[@]}
 do
     echo -e "\t${FLOATING_IPs[$machine]} to $machine"
     nova floating-ip-associate $machine ${FLOATING_IPs[$machine]}
@@ -289,18 +289,22 @@ echo "Initialization phase complete."
 
 ########################################################################
 trap "echo -e \"\nOr you can Ctrl-C, yes...\n\"; exit 0" SIGINT INT
+REBOOT=y
+ASK_TIMEOUT=10 #seconds
 while : ; do # while = In a subshell
     echo -n -e "\nWould you like to reboot the servers before you provision them? [y/N] "
-    read -t 10 yn # timeout for 10 seconds
-    [ $? != 0 ] && echo " (timeout)" && break;
+    read -t ${ASK_TIMEOUT} yn
+    [ $? != 0 ] && echo " $REBOOT (timeout)" && break;
     case $yn in
-        y) for machine in "${MACHINES[@]}"; do
-	       echo "Rebooting $machine"
-	       nova reboot $machine 2>&1 > /dev/null
-	   done; break;;
-        N) break;;
+        y) REBOOT=y; break;;
+        N) REBOOT=N; break;;
         * ) echo "Eh?";;
     esac
+done
+
+[ $REBOOT = y ] && for machine in ${MACHINES[@]}; do
+    echo "Rebooting $machine"
+    nova reboot $machine 2>&1 > /dev/null
 done
 
 # Finito
