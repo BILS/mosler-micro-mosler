@@ -83,6 +83,7 @@ declare -A JOB_PIDS
 function cleanup {
     [ "$VERBOSE" = "yes" ] && echo -e "\nStopping background jobs"
     kill -9 $(jobs -p) &>/dev/null
+    exit 1
 }
 trap 'cleanup' INT TERM #EXIT #HUP ERR
 # Or just kill the parent. That should kill the processes in that process group

@@ -113,7 +113,7 @@ do
 	    if [ "$machine" == "openstack-controller" ]; then
 		for img in project-computenode-stable project-loginnode-stable topolino-q-stable; do
 		    [ -f ${MOSLER_IMAGES}/$img ] &&
-			rsync -av -e "ssh -F ${SSH_CONFIG}" ${MOSLER_IMAGES}/$img ${FLOATING_IPs[$machine]}:${VAULT}/.
+			rsync -av --no-perms -e "ssh -F ${SSH_CONFIG}" ${MOSLER_IMAGES}/$img ${FLOATING_IPs[$machine]}:${VAULT}/.
 		done
 	    fi
 	    

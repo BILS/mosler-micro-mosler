@@ -39,3 +39,11 @@ if [ -f /etc/neutron/plugin.ini ]; then
     rm /etc/neutron/plugin.ini
 fi
 ln -s /etc/neutron/plugins/ml2/ml2.ini /etc/neutron/plugin.ini
+
+
+for img in project-computenode-stable project-loginnode-stable topolino-q-stable
+do
+    chown glance:glance {{ env['VAULT'] }}/$img
+    chmod 640 {{ env['VAULT'] }}/$img
+done
+
