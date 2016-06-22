@@ -69,17 +69,18 @@ echo "REMEMBER: export OS_TENANT_NAME=${PROJECT_NAME}"
 OS_TENANT_NAME="${PROJECT_NAME}"
 export OS_TENANT_NAME
 
-/usr/local/bin/get_vlan.sh "${PROJECT_NAME}"
+#/usr/local/bin/get_vlan.sh "${PROJECT_NAME}"
 
-if /usr/local/bin/nfs_san_check.sh ; then
-  :
-else
-  echo "NFS Sanity check failed, aborting."
-  exit 1
-fi
+# if /usr/local/bin/nfs_san_check.sh ; then
+#   :
+# else
+#   echo "NFS Sanity check failed, aborting."
+#   exit 1
+# fi
 
 
-bash -x /usr/local/bin/create_heat_template.sh "${PROJECT_NAME}"
+set -x -e
+/usr/local/bin/create_heat_template.sh "${PROJECT_NAME}"
 
 /usr/local/sbin/thinlinc_proj_setup
 

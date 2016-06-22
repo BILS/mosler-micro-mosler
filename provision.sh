@@ -164,19 +164,23 @@ else
 fi
 
 if [ $WITH_KEY = yes ]; then
-    [ "$VERBOSE" = "yes" ] && echo "Generating SSH key pair for supernode"
-    rm -f ${MM_TMP}/ssh_key.${OS_TENANT_NAME} ${MM_TMP}/ssh_key.${OS_TENANT_NAME}.pub
-    ssh-keygen -q -t rsa -N "micromosler" -f ${MM_TMP}/ssh_key.${OS_TENANT_NAME} -C supernode
-    scp -q -F ${SSH_CONFIG} ${MM_TMP}/ssh_key.${OS_TENANT_NAME} ${FLOATING_IPs[supernode]}:${VAULT}/id_rsa
-    for machine in ${MACHINES[@]}
-    do
-	scp -q -F ${SSH_CONFIG} ${MM_TMP}/ssh_key.${OS_TENANT_NAME}.pub ${FLOATING_IPs[$machine]}:${VAULT}/id_rsa.pub
-    done
-
-    ssh -F ${SSH_CONFIG} ${FLOATING_IPs[supernode]} "sudo mv ${VAULT}/id_rsa ${VAULT}/id_rsa.pub /root/.ssh/."
+    [ "$VERBOSE" = "yes" ] && echo "Handling supernode access to other machines"
+    # If one of the two does not exit, recreate them the key pair.
+    if [ ! -e ${MM_TMP}/ssh_key.${OS_TENANT_NAME} ] || [ -e ${MM_TMP}/ssh_key.${OS_TENANT_NAME}.pub ]; then
+	rm -f ${MM_TMP}/ssh_key.${OS_TENANT_NAME} ${MM_TMP}/ssh_key.${OS_TENANT_NAME}.pub
+	ssh-keygen -q -t rsa -N "" -f ${MM_TMP}/ssh_key.${OS_TENANT_NAME} -C supernode
+    fi
+    scp -q -F ${SSH_CONFIG} ${MM_TMP}/ssh_key.${OS_TENANT_NAME} ${MM_TMP}/ssh_key.${OS_TENANT_NAME}.pub ${FLOATING_IPs[supernode]}:${VAULT}/.
+    ssh -F ${SSH_CONFIG} ${FLOATING_IPs[supernode]} 'sudo bash -e -x 2>&1' <<EOF &>/dev/null
+mv ${VAULT}/ssh_key.${OS_TENANT_NAME} /root/.ssh/id_rsa
+mv ${VAULT}/ssh_key.${OS_TENANT_NAME}.pub /root/.ssh/id_rsa.pub
+chmod 600 /root/.ssh/id_rsa
+chmod 644 /root/.ssh/id_rsa.pub
+EOF
     for machine in ${MACHINES[@]}
     do
 	[ "$machine" == "supernode" ] && continue
+	scp -q -F ${SSH_CONFIG} ${MM_TMP}/ssh_key.${OS_TENANT_NAME}.pub ${FLOATING_IPs[$machine]}:${VAULT}/id_rsa.pub
 	ssh -F ${SSH_CONFIG} ${FLOATING_IPs[$machine]} 'sudo bash -e -x 2>&1' <<EOF &>/dev/null
 sudo sed -i -e '/supernode/d' /root/.ssh/authorized_keys
 cat ${VAULT}/id_rsa.pub >> /root/.ssh/authorized_keys

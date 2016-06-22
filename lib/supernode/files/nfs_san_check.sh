@@ -10,20 +10,14 @@ else
 fi
 
 . /root/.keystonerc
-. /etc/smudetails
 
 tmpfil=/tmp/nfssan.$$
 
 test -e "$tmpfil" && exit 1
 
-ssh manager@meles-smu ssc -u "$SMUUSER" -p "$SMUPASS" 192.0.2.7 > "$tmpfil" <<EOF
-console-context --evs MEVS1
-nfs-export list
+ssh root@hnas-emulation 'showmount -e' > $tmpfil
 
-EOF
-
-
-grep '^192.168' "$tmpfil" | sed -e 's/(.*//' | sort | uniq -c  | while read count net; do
+grep '^192.168' $tmpfil | sed -e 's/(.*//' | sort | uniq -c | while read count net; do
 
   if [ "$count" -gt 1 ] ; then
     echo 'INSANITY!'

@@ -8,8 +8,6 @@ filter () {
 }
 
 
-. /etc/smudetails
-
 proj="$1"
 
 if [ "x$proj" = x ]; then
@@ -25,7 +23,7 @@ else
 fi
 
 heat --os-tenant-name="$proj" stack-list | filter 2 | while read stack; do
-  heat  --os-tenant-name="$proj" stack-delete "$stack"
+    heat  --os-tenant-name="$proj" stack-delete "$stack"
   sleep 5
   while heat --os-tenant-name="$proj" stack-list | grep -q DELETE_IN_PROGRESS; do
     sleep 5
@@ -34,7 +32,6 @@ done
 
 
 #sleep 10
-
 
 nova --os-tenant-name="$proj" list | filter 2 | while read machine; do
   nova delete "$machine"
@@ -71,9 +68,9 @@ neutron security-group-list | grep "${proj}-mosler_default" |  filter 2 | while 
   neutron security-group-delete "$secgroup"
 done
 
-ssh manager@meles-smu ssc -u "$SMUUSER" -p "$SMUPASS" 192.0.2.7 > /dev/null <<EOF
-console-context --evs MEVS1
-nfs-export del /$proj
+ssh root@hnas-emulation <<EOF
+exportfs -u *:/mnt/nfs/$proj
+# Should remove the VLAN interface too.
 EOF
 
 echo "Removed (or tried at least) to remove project $proj. If there "

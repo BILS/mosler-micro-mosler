@@ -1,0 +1,10 @@
+compute-node-@@@INDEX@@@:
+   type: OS::Nova::Server
+   depends_on: [ private_net, private_subnet ]
+   properties:
+     name: { 'Fn::Join': [ "", [{ get_param: project_name }, "-compute_node-@@@INDEX@@@" ]]}
+     image: @@@IMAGE@@@
+     flavor: @@@FLAVOR@@@
+     security_groups: [ { get_resource: server_security_group } ]
+     networks:
+     - network: { 'Fn::Join': [ "", [{ get_param: project_name }, "-private_net" ]]}

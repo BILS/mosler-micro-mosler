@@ -161,17 +161,21 @@ cat <<EOF >> ${TEMPLATE_DIR}/heat-${PROJECT_NAME}.template
 
 EOF
 
-#
-# Add login node resources
-#
-echo "" >> ${TEMPLATE_DIR}/heat-${PROJECT_NAME}.template
-cat ${TEMPLATE_DIR}/mosler-template-resources-loginnode >> ${TEMPLATE_DIR}/heat-${PROJECT_NAME}.template
+neutron net-delete ${PROJECT_NAME}-private_net_dummy
 
-#
-# Add service node resources
-#
-echo "" >> ${TEMPLATE_DIR}/heat-${PROJECT_NAME}.template
-cat ${TEMPLATE_DIR}/mosler-template-resources-servicenode >> ${TEMPLATE_DIR}/heat-${PROJECT_NAME}.template
+sleep 15
+
+# #
+# # Add login node resources
+# #
+# echo "" >> ${TEMPLATE_DIR}/heat-${PROJECT_NAME}.template
+# cat ${TEMPLATE_DIR}/mosler-template-resources-loginnode >> ${TEMPLATE_DIR}/heat-${PROJECT_NAME}.template
+
+# #
+# # Add service node resources
+# #
+# echo "" >> ${TEMPLATE_DIR}/heat-${PROJECT_NAME}.template
+# cat ${TEMPLATE_DIR}/mosler-template-resources-servicenode >> ${TEMPLATE_DIR}/heat-${PROJECT_NAME}.template
 
 #
 # Add compute node resources
@@ -179,24 +183,20 @@ cat ${TEMPLATE_DIR}/mosler-template-resources-servicenode >> ${TEMPLATE_DIR}/hea
 #echo "" >> ${TEMPLATE_DIR}/heat-${PROJECT_NAME}.template
 #cat ${TEMPLATE_DIR}/mosler-template-resources-computenodes >> ${TEMPLATE_DIR}/heat-${PROJECT_NAME}.template
 
-neutron net-delete ${PROJECT_NAME}-private_net_dummy
-
-sleep 15
-
-
 # Allow diff
 
 if [ -f "${TEMPLATE_DIR}/heat-${PROJECT_NAME}.special" ]; then
   patch -p0 "${TEMPLATE_DIR}/heat-${PROJECT_NAME}.template" < "${TEMPLATE_DIR}/heat-${PROJECT_NAME}.special"
 fi
 
-
-
 heat stack-update -f ${TEMPLATE_DIR}/heat-${PROJECT_NAME}.template -P "project_name=${PROJECT_NAME};private_seg_id=${VLAN}" --rollback y ${PROJECT_NAME}
 
 while heat stack-list | grep -q "${PROJECT_NAME}.*_IN_PROGRESS" ; do
   sleep 5
 done
+
+echo 'Exiting early today'
+exit 0
 
 /usr/local/bin/heat_add_compute.sh --project ${PROJECT_NAME} --index 1 --flavor mosler.8cores --image project-computenode-stable
 

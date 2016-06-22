@@ -1,55 +1,60 @@
 #!/bin/bash
 
+[ $(id -u) -ne 0 ] && echo "Please run as root/sudo" && exit 1
 
-myuid=`id -u`
-
-if [ "$myuid" -eq 0 ]; then
-  :
-else
-  echo "Please run as root/sudo"
-  exit 1
-fi
-
-PROJECT_NAME="$1"
+PROJECT_NAME=$1
 VLAN=$2
-PROJECT_FS="v1"
-HOME_FS="h1"
 
-. /etc/smudetails
-
-if [ "X${PROJECT_NAME}" == "X" ]; then
+if [ -z "${PROJECT_NAME}" ]; then
    echo "You must provide a project name"
    echo ""
    echo "$0 project_name VLAN_NUMBER"
    exit 1
 fi
 
-if [ "X${VLAN}" == "X" ]; then
-   echo "You must provide VLAN number"
-   echo "$0 project_name VLAN_NUMBER"
+if [ -z "${VLAN}" ]; then
+   echo "You must provide a VLAN number"
+   echo "$0 <project_name> <VLAN_NUMBER>"
    exit 2
 fi
 
 SUBNET=$((VLAN%1000))
-IP="192.168.${SUBNET}.254"
+IP="192.168.${SUBNET}.254" # Note: should be the floating ip. Not yet there!
 NETMASK=255.255.255.0
-NET=`echo ${IP} | awk -F '.' '{printf "%s.%s.%s.0\n", $1, $2, $3}'`
+PREFIX=24
 
 echo "Setting up project share, you may see failures if it exists already."
 
-ssh manager@meles-smu ssc -u "$SMUUSER" -p "$SMUPASS" 192.0.2.7 <<EOF
-console-context --evs MEVS1
-vlan add ${VLAN} ${NET}/24
-evsipaddr -e MEVS1 -a -i ${IP} -m ${NETMASK} -p ag1
+set -e # exit on errors
+ssh root@hnas-emulation 'bash -x -e' <<EOF
 
-selectfs ${PROJECT_FS}
-virtual-volume add --ensure ${PROJECT_FS} ${PROJECT_NAME} /${PROJECT_NAME}
-nfs-export add -i -c '${NET}/24(rw,secure,root_squash)' "${PROJECT_NAME}" ${PROJECT_FS} /${PROJECT_NAME}
+cat > /etc/sysconfig/network-scripts/ifcfg-eth1.${VLAN} <<ENDCFG
+TYPE=Ethernet
+VLAN=yes
+BOOTPROTO=static
+DEFROUTE=no
+NAME=eth1.${VLAN}
+DEVICE=eth1.${VLAN}
+ONBOOT=yes
+IPADDR=${IP}
+PREFIX=${PREFIX}
+ENDCFG
 
-nfs-export mod -c '${NET}/24(rw,secure,root_squash)'  /${PROJECT_NAME}
+service network restart
 
+# /sbin/ifup eth1.${VLAN}
+# ip link add link eth1 name eth1.${VLAN} type vlan id ${VLAN}
+# ip addr add ${IP}/${PREFIX} brd ${IP%%.*}.255 dev eth1.${VLAN}
+# ip link set dev eth1.${VLAN} up
+
+mkdir -p /mnt/nfs/${PROJECT_NAME}
+
+if ! grep ${PROJECT_NAME} /etc/exports; then
+echo "/mnt/nfs/${PROJECT_NAME} ${IP%.254}.0/${PREFIX}(rw,sync,no_root_squash,no_subtree_check)" >> /etc/exports
+fi
+
+showmount -e
 EOF
 
 echo "Project share set up."
 # (We change after create in case the export already existed.)
-

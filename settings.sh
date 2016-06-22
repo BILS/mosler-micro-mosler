@@ -91,6 +91,7 @@ export DATA_IPs=(\
     [compute2]=10.10.10.111 \
     [compute3]=10.10.10.112 \
     [networking-node]=10.10.10.101 \
+    [hnas-emulation]=10.10.10.102 \
 )
 export DATA_GATEWAY=10.10.10.1
 export DATA_CIDR=10.10.10.0/24

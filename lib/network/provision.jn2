@@ -19,7 +19,7 @@ echo "System config"
 	('^\s*net.bridge.bridge-nf-call-iptables\s*=.*$',  'net.bridge.bridge-nf-call-iptables=1'  ),
 	('^\s*net.bridge.bridge-nf-call-ip6tables\s*=.*$', 'net.bridge.bridge-nf-call-ip6tables=1' )
 ] -%}
-{% for regexp, lines in lines %}
+{% for regexp, line in lines %}
 sed -i -e 's/{{ regexp }}/{{ line }}/' /etc/sysctl.conf
 {% endfor %}
 

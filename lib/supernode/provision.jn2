@@ -65,17 +65,17 @@ neutron subnet-create public-net --name public-subnet --allocation-pool start=17
 
 ##############################################################
 # Mount the nfs share as /meles
-mkdir -p /meles
-if mount | grep -q meles ;then
-    umount /meles
-fi
-mount -t nfs {{ env['NFS_SERVER'] }}:/mnt/nfs /meles
+# mkdir -p /meles
+# if mount | grep -q meles ;then
+#     umount /meles
+# fi
+# mount -t nfs {{ env['NFS_SERVER'] }}:/mnt/nfs /meles
 
-if ! grep -q "{{ env['NFS_SERVER'] }}" /etc/fstab; then
-    cat >> /etc/fstab<<EOF
-{{ env['NFS_SERVER'] }}:/mnt/nfs /meles  nfs   auto,noatime,nolock,bg,nfsvers=4,intr,tcp,actimeo=1800 0 0
-EOF
-fi
+# if ! grep -q "{{ env['NFS_SERVER'] }}" /etc/fstab; then
+#     cat >> /etc/fstab<<EOF
+# {{ env['NFS_SERVER'] }}:/mnt/nfs /meles  nfs   auto,noatime,nolock,bg,nfsvers=4,intr,tcp,actimeo=1800 0 0
+# EOF
+# fi
 
 ##############################################################
 # Create project NBIS. Users come from ldap.
@@ -113,7 +113,9 @@ function wait_for_flavors {
 }
 wait_for_flavors 300
 
-exit 0 # Exiting early today...
+echo "Exiting early today..."
+exit 0
+
 if ! keystone tenant-get NBIS; then
     /usr/local/bin/create_project.sh NBIS
 fi

@@ -14,18 +14,20 @@ if ! grep -q rpcbind /etc/hosts.deny ; then
 fi
 
 if ! grep -q rpcbind /etc/hosts.allow ; then
-    echo "rpcbind mountd nfsd statd lockd rquotad : {{ env['MGMT_CIDR'] }}" >> /etc/hosts.allow
+    echo "rpcbind mountd nfsd statd lockd rquotad : ALL@{{ env['NFS_SERVER'] }}" >> /etc/hosts.allow
 fi
 
-chkconfig nfs on 
+chkconfig rpcbind on 
 service rpcbind restart
+
+chkconfig nfs on 
 service nfs restart
 
 echo "Creating NFS share"
 mkdir -p /mnt/nfs
 
-echo "/mnt/nfs {{ env['MGMT_CIDR'] }}(rw,sync,no_root_squash,no_subtree_check)" > /etc/exports
-#echo "/mnt/nfs supernode(rw,sync,no_root_squash,no_subtree_check)" > /etc/exports
+# echo "/mnt/nfs {{ env['MGMT_CIDR'] }}(rw,sync,no_root_squash,no_subtree_check)" > /etc/exports
+# #echo "/mnt/nfs supernode(rw,sync,no_root_squash,no_subtree_check)" > /etc/exports
 
-exportfs -a
+# exportfs -a
 

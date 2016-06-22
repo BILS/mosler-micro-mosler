@@ -53,15 +53,16 @@ chmod 0755 /usr/local/sbin/{{ file }}
 
 mkdir -p /usr/local/heat
 
-{% set files = [ 'mosler-template-resources-private_net-only',
-		 'mosler-template-resources-network',
-		 'mosler-template-resources-secgroups',
+{% set files = [ 'mosler-template-resources-computenode',
 		 'mosler-template-resources-loginnode',
-		 'mosler-template-resources-servicenode',
+		 'mosler-template-resources-network',
+		 'mosler-template-resources-private_net-only',
+		 'mosler-template-resources-secgroups',
+		 'mosler-template-resources-servicenode'
 	       ] -%}
 {% for file in files %}
 rsync -a {{ env['VAULT'] }}/{{ file }} /usr/local/heat/{{ file }}
 chmod 0755 /usr/local/heat/{{ file }}
 {% endfor %}
 
-{# 'mosler-template-parameters' #}
+{# 'mosler-template-parameters' is used in a different way #}
