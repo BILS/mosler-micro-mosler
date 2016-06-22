@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Get credentials and machines settings
-source $(dirname ${BASH_SOURCE[0]})/settings.sh
+source $(dirname ${BASH_SOURCE[0]})/lib/settings.sh
 
 # Default values
 ALL=no
@@ -27,22 +27,17 @@ while [ $# -gt 0 ]; do
     shift
 done                                                                                              
 
+[ $VERBOSE == 'no' ] && exec 1>${MM_TMP}/clean.log
+ORG_FD1=$(tty)
+
 TENANT_ID=$(openstack project list | awk '/'${OS_TENANT_NAME}'/ {print $2}')
-# # Checking if the user is admin for that tenant
-# CHECK=$(openstack role assignment list --user ${OS_USERNAME} --role admin --project ${OS_TENANT_NAME})
-# if [ $? -ne 0 ] || [ -z "$CHECK" ]; then
-#     echo "ERROR: $CHECK"
-#     echo -e "\nThe user ${OS_USERNAME} does not seem to have the 'admin' role for the project ${OS_TENANT_NAME}"
-#     echo "Exiting..."
-#     exit 1
-# fi
 
 #######################################################################
 
 # Cleaning all the running machines
 function delete_machine {
     local machine=$1
-    [ "$VERBOSE" = "yes" ] && echo "Deleting $machine"
+    echo "Deleting $machine"
     nova delete $machine > /dev/null
 }
 
@@ -57,26 +52,24 @@ done
 
 # Cleaning the network information
 if [ $ALL = "yes" ]; then
-    [ "$VERBOSE" = "yes" ] && echo "Cleaning the remaining VMs"
+    echo "Cleaning the remaining VMs"
     nova list --minimal --tenant ${TENANT_ID} | awk '/^$/ {next;} /^| ID / {next;} /^+--/ {next;} {print $2}' | while read m; do delete_machine $m; done
 
-    [ "$VERBOSE" = "yes" ] && echo "Cleaning the network information"
-
-    [ "$VERBOSE" = "yes" ] && echo "Disconnecting the router from the management subnet"
+    echo "Disconnecting the router from the management subnet"
     neutron router-interface-delete ${OS_TENANT_NAME}-mgmt-router ${OS_TENANT_NAME}-mgmt-subnet
     neutron router-interface-delete ${OS_TENANT_NAME}-data-router ${OS_TENANT_NAME}-data-subnet
 
-    [ "$VERBOSE" = "yes" ] && echo "Deleting router"
+    echo "Deleting router"
     neutron router-delete ${OS_TENANT_NAME}-mgmt-router
     neutron router-delete ${OS_TENANT_NAME}-data-router
 
-    [ "$VERBOSE" = "yes" ] && echo "Deleting networks and subnets"
+    echo "Deleting networks and subnets"
     neutron subnet-delete ${OS_TENANT_NAME}-mgmt-subnet
     neutron subnet-delete ${OS_TENANT_NAME}-data-subnet
     neutron net-delete ${OS_TENANT_NAME}-mgmt-net
     neutron net-delete ${OS_TENANT_NAME}-data-net
 
-    [ "$VERBOSE" = "yes" ] && echo "Deleting floating IPs"
+    echo "Deleting floating IPs"
     neutron floatingip-list -F id -F floating_ip_address | awk '/^$/ {next;} {print $2$3$4}' | while read floating; do
 	# We selected '--all'. That means, we do delete the network information.
 	# In that case, kill _all_ floating IPs since we also delete the networks
@@ -84,13 +77,13 @@ if [ $ALL = "yes" ]; then
     done
 
     # Cleaning the security group
-    [ "$VERBOSE" = "yes" ] && echo "Cleaning security group: ${OS_TENANT_NAME}-sg"
+    echo "Cleaning security group: ${OS_TENANT_NAME}-sg"
     neutron security-group-delete ${OS_TENANT_NAME}-sg
 
 fi # End cleaning if ALL
 
 if [ -d ${MM_TMP} ]; then
-    [ "$VERBOSE" = "yes" ] && echo "Cleaning the temporary folders"
+    echo "Cleaning the temporary folders"
     rm -rf ${MM_TMP}
 fi
 

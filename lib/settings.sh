@@ -10,16 +10,16 @@ export OS_IMAGE_API_VERSION=2
 export OS_ENDPOINT_TYPE=internalURL # User internal URLs
 
 # Find the absolute path to that folder
-HERE=$(cd $(dirname ${BASH_SOURCE[0]}) && pwd -P)
-if [ -f $HERE/user.rc ]; then
-    source $HERE/user.rc
+ABOVE=$(cd $(dirname ${BASH_SOURCE[0]})/.. && pwd -P)
+if [ -f $ABOVE/user.rc ]; then
+    source $ABOVE/user.rc
 else
-    echo "ERROR: User credentials not found [$HERE/user.rc]"
+    echo "ERROR: User credentials not found [$ABOVE/user.rc]"
     exit 1;
 fi
 
 if [ -z $OS_TENANT_NAME ]; then
-    echo "ERROR: No tenant name found in [$HERE/user.rc]"
+    echo "ERROR: No tenant name found in [$ABOVE/user.rc]"
     echo "Exiting..."
     exit 1;
 fi
@@ -32,7 +32,7 @@ export VERBOSE=yes
 # Making these variables immutable
 # Note: Can source this file several times
 
-[ -n "$MM_HOME" ]       || readonly MM_HOME=$HERE
+[ -n "$MM_HOME" ]       || readonly MM_HOME=$ABOVE
 [ -n "$TL_HOME" ]       || readonly TL_HOME=/home/jonas/thinlinc
 [ -n "$MOSLER_IMAGES" ] || readonly MOSLER_IMAGES=/home/jonas/mosler-images
 

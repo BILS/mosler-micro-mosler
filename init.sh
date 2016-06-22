@@ -1,13 +1,11 @@
 #!/usr/bin/env bash
 
 # Get credentials and machines settings
-HERE=$(dirname ${BASH_SOURCE[0]})
-source $HERE/settings.sh
+source $(dirname ${BASH_SOURCE[0]})/lib/settings.sh
 
 # Default values
 _ALL=no
 _IMAGE=CentOS6-micromosler
-LIB=$HERE/lib
 
 function usage {
     echo "Usage: $0 [options]"
@@ -38,6 +36,10 @@ while [ $# -gt 0 ]; do
     shift
 done
 
+mkdir -p ${MM_TMP}
+
+[ $VERBOSE == 'no' ] && exec 1>${MM_TMP}/init.log
+ORG_FD1=$(tty)
 
 # Create the host file first
 cat > ${MM_TMP}/hosts <<ENDHOST
@@ -59,19 +61,16 @@ if [ -n ${CUSTOM_MACHINES:-''} ]; then
 	if [[ "${MACHINES[@]}" =~ "$cm" ]]; then
 	    CUSTOM_MACHINES+="$cm "
 	else
-	    echo "Unknown machine: $cm"
+	    echo "Unknown machine: $cm" > ${ORG_FD1}
 	fi
-	# for m in ${MACHINES[@]}; do
-	#     [ "$cm" = "$m" ] && CUSTOM_MACHINES+=" $cm" && break
-	# done
     done
     if [ -n "$CUSTOM_MACHINES" ]; then
-	[ "$VERBOSE" = "yes" ] && echo "Using these machines: ${CUSTOM_MACHINES// /,}"
+	echo "Using these machines: ${CUSTOM_MACHINES// /,}"
 	MACHINES=($CUSTOM_MACHINES)
     else
-	echo "Error: all custom machines are unknown"
-	echo "Nothing to be done..."
-	echo -e "Exiting\!"
+	echo "Error: all custom machines are unknown" > ${ORG_FD1}
+	echo "Nothing to be done..." > ${ORG_FD1}
+	echo -e "Exiting\!" > ${ORG_FD1}
 	exit 2
     fi  
 fi
@@ -96,7 +95,7 @@ EXTNET_ID=$(neutron net-list | awk '/ public /{print $2}')
 
 if [ ${_ALL} = "yes" ]; then
 
-    [ "$VERBOSE" = "yes" ] && echo "Creating routers and networks"
+    echo "Creating routers and networks"
 
     MGMT_ROUTER_ID=$(neutron router-create ${OS_TENANT_NAME}-mgmt-router | awk '/ id / { print $4 }')
     DATA_ROUTER_ID=$(neutron router-create ${OS_TENANT_NAME}-data-router | awk '/ id / { print $4 }')
@@ -104,7 +103,7 @@ if [ ${_ALL} = "yes" ]; then
     if [ -z "$MGMT_ROUTER_ID" ] || [ -z "$DATA_ROUTER_ID" ]; then
 	echo "Router issues, skipping."
     else
-	[ "$VERBOSE" = "yes" ] && echo -e "Attaching Management router to the External \"public\" network"
+	echo -e "Attaching Management router to the External \"public\" network"
 	neutron router-gateway-set $MGMT_ROUTER_ID $EXTNET_ID
     fi
     
@@ -124,12 +123,12 @@ if [ ${_ALL} = "yes" ]; then
     neutron router-interface-add ${OS_TENANT_NAME}-data-router ${OS_TENANT_NAME}-data-subnet
     
 
-    [ "$VERBOSE" = "yes" ] && echo "Creating the floating IPs"
+    echo "Creating the floating IPs"
     for machine in ${MACHINES[@]}; do
 	neutron floatingip-create --tenant-id ${TENANT_ID} --floating-ip-address ${FLOATING_IPs[$machine]} public
     done
 
-    [ "$VERBOSE" = "yes" ] && echo "Creating the Security Group: ${OS_TENANT_NAME}-sg"
+    echo "Creating the Security Group: ${OS_TENANT_NAME}-sg"
     neutron security-group-create ${OS_TENANT_NAME}-sg
     neutron security-group-rule-create ${OS_TENANT_NAME}-sg --direction ingress --ethertype ipv4 --protocol icmp 
     neutron security-group-rule-create ${OS_TENANT_NAME}-sg --direction ingress --ethertype ipv4 --protocol tcp --port-range-min 22 --port-range-max 22
@@ -137,7 +136,7 @@ if [ ${_ALL} = "yes" ]; then
     neutron security-group-rule-create ${OS_TENANT_NAME}-sg --ethertype ipv4 --direction ingress --remote-group-id ${OS_TENANT_NAME}-sg
     neutron security-group-rule-create ${OS_TENANT_NAME}-sg --ethertype ipv4 --direction egress --remote-group-id ${OS_TENANT_NAME}-sg
 
-    [ "$VERBOSE" = "yes" ] && echo "Setting the quotas"
+    echo "Setting the quotas"
     FACTOR=2
     nova quota-update --instances $((10 * FACTOR)) --ram $((51200 * FACTOR)) ${TENANT_ID}
 
@@ -156,21 +155,21 @@ fi
 MGMT_NET=$(neutron net-list --tenant_id=${TENANT_ID} | awk '/ '${OS_TENANT_NAME}-mgmt-net' /{print $2}')
 DATA_NET=$(neutron net-list --tenant_id=${TENANT_ID} | awk '/ '${OS_TENANT_NAME}-data-net' /{print $2}')
 
-[ "$VERBOSE" = "yes" ] && echo -e "Management Net: $MGMT_NET\nData Net: $DATA_NET"
+echo -e "Management Net: $MGMT_NET\nData Net: $DATA_NET"
 
 if [ -z "$MGMT_NET" ] || [ -z "$DATA_NET" ]; then
-    echo "Error: Could not find the Management or Data network"
-    echo -e "\tMaybe you should re-run with the --all flags?"
+    echo "Error: Could not find the Management or Data network" > ${ORG_FD1}
+    echo -e "\tMaybe you should re-run with the --all flags?" > ${ORG_FD1}
     exit 1
 fi
 
 ########################################################################
 # Start the local REST server, to follow the progress of the machines
 ########################################################################
-[ "$VERBOSE" = "yes" ] && echo "Starting the REST phone home server"
+echo "Starting the REST phone home server"
 fuser -k ${PORT}/tcp || true
 trap "fuser -k ${PORT}/tcp &>/dev/null || true; exit 1" SIGINT SIGTERM EXIT
-python $LIB/boot_progress.py $PORT "${MACHINES[@]}" &
+python ${MM_HOME}/lib/boot_progress.py $PORT "${MACHINES[@]}" 2>&1 &
 REST_PID=$!
 
 function boot_machine {
@@ -254,7 +253,7 @@ ENDCLOUDINIT
 
 
 # Booting a machine
-[ "$VERBOSE" = "yes" ] && echo -e "\t* $machine"
+echo -e "\t* $machine"
 nova boot --flavor $flavor --image ${_IMAGE} --security-group ${OS_TENANT_NAME}-sg \
 --nic net-id=${MGMT_NET},v4-fixed-ip=$ip $DN \
 --user-data ${_VM_INIT} \
@@ -268,22 +267,24 @@ $machine 2>&1 > /dev/null
 ########################################################################
 # Aaaaannndddd....cue music!
 ########################################################################
-[ "$VERBOSE" = "yes" ] && echo "Booting the machines"
+echo "Booting the machines"
 for machine in ${MACHINES[@]}; do boot_machine $machine; done
 
 ########################################################################
-[ "$VERBOSE" = "yes" ] && echo "Waiting for the REST phone home server (PID: ${REST_PID})"
+echo "Waiting for the REST phone home server (PID: ${REST_PID})"
 wait ${REST_PID}
-[ "$VERBOSE" = "yes" ] && echo "The last machine just phoned home."
+echo "The last machine just phoned home."
 
 ########################################################################
-[ "$VERBOSE" = "yes" ] && echo -e "Associating floating IPs"
+echo -e "Associating floating IPs"
 for machine in ${MACHINES[@]}
 do
     echo -e "\t${FLOATING_IPs[$machine]} to $machine"
     nova floating-ip-associate $machine ${FLOATING_IPs[$machine]}
 done
 
+########################################################################
+exec 1>${ORG_FD1}
 echo "Initialization phase complete."
 
 ########################################################################
@@ -302,10 +303,7 @@ while : ; do # while = In a subshell
 done
 
 [ $REBOOT = y ] && for machine in ${MACHINES[@]}; do
-    echo "Rebooting $machine"
+    [ $VERBOSE == 'yes' ] && echo "Rebooting $machine"
     nova reboot $machine 2>&1 > /dev/null
 done
-
-# Finito
-exit 0
 

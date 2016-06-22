@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 
 # Get credentials and machines settings
-HERE=$(dirname ${BASH_SOURCE[0]})
-source $HERE/settings.sh
+source $(dirname ${BASH_SOURCE[0]})/lib/settings.sh
 
 export VAULT=vault
 CONNECTION_TIMEOUT=1 #seconds
@@ -42,6 +41,9 @@ while [ $# -gt 0 ]; do
     shift
 done
 
+[ $VERBOSE == 'no' ] && exec 1>${MM_TMP}/provision.log
+ORG_FD1=$(tty)
+
 #######################################################################
 # Logic to allow the user to specify some machines
 if [ -n ${CUSTOM_MACHINES:-''} ]; then
@@ -51,7 +53,7 @@ if [ -n ${CUSTOM_MACHINES:-''} ]; then
 	if [[ "${MACHINES[@]}" =~ "$cm" ]]; then
 	    CUSTOM_MACHINES+="$cm "
 	else
-	    echo "Unknown machine: $cm"
+	    echo "Unknown machine: $cm" >${ORG_FD1}
 	fi
 	# for m in ${MACHINES[@]}; do
 	#     [ "$cm" = "$m" ] && CUSTOM_MACHINES+=" $cm" && break
@@ -59,7 +61,7 @@ if [ -n ${CUSTOM_MACHINES:-''} ]; then
     done
     MACHINES=(${CUSTOM_MACHINES})
 
-    [ "$VERBOSE" = "yes" ] && echo "Using these machines: ${CUSTOM_MACHINES// /,}"
+    echo "Using these machines: ${CUSTOM_MACHINES// /,}"
 
 fi
 
@@ -76,7 +78,7 @@ source $LIB/utils.sh
 source $LIB/ssh_connections.sh
 
 if [ ${#MACHINES[@]} -eq 0 ]; then
-    echo "Nothing to be done. Exiting..."
+    echo "Nothing to be done. Exiting..." >${ORG_FD1}
     exit 2 # or 0?
 fi
 
@@ -84,7 +86,7 @@ fi
 
 declare -A JOB_PIDS
 function cleanup {
-    [ "$VERBOSE" = "yes" ] && echo -e "\nStopping background jobs"
+    echo -e "\nStopping background jobs"
     kill -9 $(jobs -p) &>/dev/null
     exit 1
 }
@@ -95,7 +97,7 @@ trap 'cleanup' INT TERM #EXIT #HUP ERR
 #######################################################################
 # Aaaaannnnnddd...... cue music!
 ########################################################################
-[ "$VERBOSE" = "yes" ] && echo -e "Configuring servers:"
+echo -e "Configuring servers:"
 FAIL=0
 reset_progress
 print_progress
@@ -155,16 +157,10 @@ EOF
 done
     
 for job in ${JOB_PIDS[@]}; do wait $job || ((FAIL++)); done
-print_progress
 
-if (( FAIL > 0 )); then
-    oups "\a\n${FAIL} servers failed to be configured"
-else
-    [ "$VERBOSE" = "yes" ] && thumb_up "\nServers configured"
-fi
-
+########################################################################
 if [ $WITH_KEY = yes ]; then
-    [ "$VERBOSE" = "yes" ] && echo "Handling supernode access to other machines"
+    echo "Handling supernode access to other machines"
     # If one of the two does not exit, recreate them the key pair.
     if [ ! -e ${MM_TMP}/ssh_key.${OS_TENANT_NAME} ] || [ -e ${MM_TMP}/ssh_key.${OS_TENANT_NAME}.pub ]; then
 	rm -f ${MM_TMP}/ssh_key.${OS_TENANT_NAME} ${MM_TMP}/ssh_key.${OS_TENANT_NAME}.pub
@@ -187,5 +183,13 @@ cat ${VAULT}/id_rsa.pub >> /root/.ssh/authorized_keys
 rm ${VAULT}/id_rsa.pub
 EOF
     done
+fi
 
+########################################################################
+exec 1>${ORG_FD1}
+print_progress # to have a clear picture
+if (( FAIL > 0 )); then
+    oups "\a\n${FAIL} servers failed to be configured"
+else
+    thumb_up "\nServers configured"
 fi

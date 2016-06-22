@@ -7,7 +7,7 @@
 SSH_CONFIG=${MM_TMP}/ssh_config.${OS_TENANT_NAME}
 SSH_KNOWN_HOSTS=${MM_TMP}/ssh_known_hosts.${OS_TENANT_NAME}
 
-[ "$VERBOSE" = "yes" ] && echo -e "Checking the connections:"
+echo -e "Checking the connections:"
 reset_progress
 CONNECTION_FAIL=""
 cat > ${SSH_CONFIG} <<ENDSSHCFG

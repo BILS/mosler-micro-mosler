@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 
 # Get credentials and machines settings
-HERE=$(dirname ${BASH_SOURCE[0]})
-source $HERE/settings.sh
+source $(dirname ${BASH_SOURCE[0]})/lib/settings.sh
 
 export VAULT=vault
 CONNECTION_TIMEOUT=1 #seconds
@@ -37,6 +36,9 @@ while [ $# -gt 0 ]; do
     shift
 done
 
+[ $VERBOSE == 'no' ] && exec 1>${MM_TMP}/sync.log
+ORG_FD1=$(tty)
+
 #######################################################################
 # Logic to allow the user to specify some machines
 if [ -n ${CUSTOM_MACHINES:-''} ]; then
@@ -46,15 +48,12 @@ if [ -n ${CUSTOM_MACHINES:-''} ]; then
 	if [[ "${MACHINES[@]}" =~ "$cm" ]]; then
 	    CUSTOM_MACHINES+="$cm "
 	else
-	    echo "Unknown machine: $cm"
+	    echo "Unknown machine: $cm" > ${ORG_FD1}
 	fi
-	# for m in ${MACHINES[@]}; do
-	#     [ "$cm" = "$m" ] && CUSTOM_MACHINES+=" $cm" && break
-	# done
     done
     MACHINES=(${CUSTOM_MACHINES})
 
-    [ "$VERBOSE" = "yes" ] && echo "Using these machines: ${CUSTOM_MACHINES// /,}"
+    echo "Using these machines: ${CUSTOM_MACHINES// /,}"
 
 fi
 
@@ -71,7 +70,7 @@ source $LIB/utils.sh
 source $LIB/ssh_connections.sh
 
 if [ ${#MACHINES[@]} -eq 0 ]; then
-    echo "Nothing to be done. Exiting..."
+    echo "Nothing to be done. Exiting..." >${ORG_FD1}
     exit 2 # or 0?
 fi
 
@@ -79,14 +78,14 @@ fi
 
 declare -A JOB_PIDS
 function cleanup {
-    [ "$VERBOSE" = "yes" ] && echo -e "\nStopping background jobs"
+    echo -e "\nStopping background jobs"
     kill -9 $(jobs -p) &>/dev/null
 }
 trap 'cleanup' INT TERM #EXIT #HUP ERR
 # Or just kill the parent. That should kill the processes in that process group
 # trap "trap - SIGTERM && kill -- -$$" SIGINT SIGTERM EXIT
 
-[ "$VERBOSE" = "yes" ] && echo "Syncing servers"
+echo "Syncing servers"
 FAIL=0
 reset_progress
 print_progress
@@ -138,12 +137,13 @@ do
 done
 # Wait for all the copying to finish
 for job in ${JOB_PIDS[@]}; do wait ${job} || ((FAIL++)); print_progress; done
-#print_progress # to have a clear picture
+
+########################################################################
+exec 1>${ORG_FD1}
+print_progress # to have a clear picture
 if (( FAIL > 0 )) ; then
     oups "\nFailed copying"
-    #kill_notifications # already trapped
-    echo "Exiting..." 
     exit 1
 else
-    [ "$VERBOSE" = "yes" ] && thumb_up "\nSyncing successful"
+    thumb_up "\nSyncing successful"
 fi
