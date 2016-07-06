@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 
 # Get credentials and machines settings
-source $(dirname ${BASH_SOURCE[0]})/lib/settings.sh
+source $(dirname ${BASH_SOURCE[0]})/settings.sh
 
 # Default values
 _ALL=no
 _IMAGE=CentOS6-micromosler
 
 function usage {
-    echo "Usage: $0 [options]"
+    echo "Usage: ${MM_CMD:-$0} [options]"
     echo -e "\noptions are"
     echo -e "\t--all,-a         \tCreates also networks, routers, security groups and floating IPs"
     echo -e "\t--machines <list>,"
@@ -70,7 +70,7 @@ if [ -n ${CUSTOM_MACHINES:-''} ]; then
     else
 	echo "Error: all custom machines are unknown" > ${ORG_FD1}
 	echo "Nothing to be done..." > ${ORG_FD1}
-	echo -e "Exiting\!" > ${ORG_FD1}
+	echo -e 'Exiting!' > ${ORG_FD1}
 	exit 2
     fi  
 fi

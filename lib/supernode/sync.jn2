@@ -32,7 +32,6 @@ chmod 0755 /usr/local/bin/{{ file }}
 {% endfor %}
 
 {% set files = [ 'approveimage',
-		 'backup',
 		 'filsluss_cron_export',
 		 'filsluss_cron_import',
 		 'fix_hostdata',

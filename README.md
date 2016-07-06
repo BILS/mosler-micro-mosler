@@ -15,7 +15,7 @@ You first need to create a file (named 'user.rc') in order to set up your openst
 This user must have the admin role for the given tenant/project. These
 settings will probably be given to you by your _openstack administrator_.
 
-The scripts define some variables (in `settings.sh`)
+The scripts define some variables (in `lib/settings.sh`)
 * `MM_HOME` (that current folder)
 * `TL_HOME` (currently pointing to `/home/jonas/thinlinc`)
 * `MOSLER_IMAGES` (currently pointing to `/home/jonas/mosler-images`)
@@ -26,22 +26,22 @@ The scripts assume that
 * And the mosler images are available in `$MOSLER_IMAGES`
 
 ## Execution
-You can run `init.sh --all` in order to create the necessary routers,
+You can run `micromosler.sh init --all` in order to create the necessary routers,
 networks and security groups, prior to creating the virtual machines.
 It will start the VMs with proper IP information. In subsequent runs,
-`init.sh` will only create the VMs.
+`micromosler.sh init` will only create the VMs.
 
-Run `sync.sh` in order to set up the ssh environment and copy the
-required files to the appropriate servers (along with installing the
-required packages).
+Run `micromosler.sh sync` in order to set up the ssh environment and
+copy the required files to the appropriate servers (along with
+installing the required packages).
 
-Run `provision.sh` in order to set up the ssh environment and
-provision each VM. This configures the servers. The task should be
+Run `micromosler.sh provision` in order to set up the ssh environment
+and provision each VM. This configures the servers. The task should be
 idempotent.
 
-The `clean.sh` script can be run with the --all flag, to destroy
-routers, networks, security groups and floating IPs.  Otherwise, it
-only deletes the running VMs.
+The `micromosler.sh clean` script can be run with the --all flag, to
+destroy routers, networks, security groups and floating IPs.
+Otherwise, it only deletes the running VMs.
 
 You can append the `-q` flag to turn off the verbose output.
 You can append the `-h` flag to see the command options.
@@ -54,16 +54,17 @@ You can append the `-h` flag to see the command options.
 	export OS_USERNAME=fred
 	export OS_PASSWORD=holala
 	EOF
-
 	# The openstack user 'fred' must maybe be an admin on the tenant 'mmosler1'
-	./init.sh --all # You'll be prompted at the end for a reboot.
-	                # Rebooting will help the partition to correctly resize to the disk size
-	./sync.sh # Wait a bit, servers are probably not done rebooting
-	./provision.sh 
+	#
+	#...and cue music!
+	./micromosler.sh init --all # You'll be prompted at the end for a reboot.
+	                            # Rebooting will help the partition to correctly resize to the disk size
+	./micromosler.sh sync       # Wait a bit, servers are probably not done rebooting
+	./micromosler.sh provision 
 	
 	# Later
-	./provision.sh # to just re-configure µ-mosler. The task is idempotent.
-	./clean.sh     # to destroy the VMs
-	./init.sh      # to re-create them, but not the networks, routers, etc...
-	./sync.sh      # Wait again a bit, still probably rebooting
-	./provision.sh # shoot again...
+	./micromosler.sh provision # to just re-configure µ-mosler. The task is idempotent.
+	./micromosler.sh clean     # to destroy the VMs
+	./micromosler.sh init      # to re-create them, but not the networks, routers, etc...
+	./micromosler.sh sync      # Wait again a bit, still probably rebooting
+	./micromosler.sh provision # shoot again...

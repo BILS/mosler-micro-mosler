@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 
 # Get credentials and machines settings
-source $(dirname ${BASH_SOURCE[0]})/lib/settings.sh
+source $(dirname ${BASH_SOURCE[0]})/settings.sh
 
 # Default values
 ALL=no
 
 function usage {
-    echo "Usage: $0 [options]"
+    echo "Usage: ${MM_CMD:-$0} [options]"
     echo -e "\noptions are"
     echo -e "\t--all,-a         \tDeletes also networks, routers, security groups and floating IPs"
     echo -e "\t--quiet,-q       \tRemoves the verbose output"

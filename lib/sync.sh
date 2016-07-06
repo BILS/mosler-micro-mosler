@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 
 # Get credentials and machines settings
-source $(dirname ${BASH_SOURCE[0]})/lib/settings.sh
+source $(dirname ${BASH_SOURCE[0]})/settings.sh
 
 export VAULT=vault
 CONNECTION_TIMEOUT=1 #seconds
 
 function usage {
-    echo "Usage: $0 [options]"
+    echo "Usage: ${MM_CMD:-$0} [options]"
     echo -e "\noptions are"
     echo -e "\t--machines <list>,"
     echo -e "\t        -m <list>      \tA comma-separated list of machines"
