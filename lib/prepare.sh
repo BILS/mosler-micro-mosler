@@ -6,21 +6,23 @@ source $(dirname ${BASH_SOURCE[0]})/settings.sh
 # Exit on errors
 #set -e 
 VM_NAME=prepare
+KEY_NAME=daz-micromosler
 IMAGE_NAME=CentOS6-micromosler
 DELETE_VM=yes
 DELETE_IMAGE=yes
-
 function usage {
     local defaults=${MACHINES[@]}
-    echo "Usage: $0 [options]"
+    echo "Usage: ${MM_CMD:-$0} [options]"
     echo -e "\noptions are"
-    echo -e "\t--quiet,-q       \tRemoves the verbose output"
-    echo -e "\t--help,-h        \tOutputs this message and exits"
-    echo -e "\t--vm <name>      \tName of the VM for preparation. Default: ${VM_NAME}"
-    echo -e "\t--image <name>   \tName of the glance image to snapshot. Default: ${IMAGE_NAME}"
-    echo -e "\t--no-delete-image\tDo not delete the given image first"
-    echo -e "\t--no-delete-vm   \tDo not delete the temporary VM afterwards"
-    echo -e "\t-- ...           \tAny other options appearing after the -- will be ignored"
+    echo -e "\t--quiet,-q         \tRemoves the verbose output"
+    echo -e "\t--help,-h          \tOutputs this message and exits"
+    echo -e "\t--vm <name>        \tName of the VM for preparation. Default: ${VM_NAME}"
+    echo -e "\t--image <name>     \tName of the glance image to snapshot. Default: ${IMAGE_NAME}"
+    echo -e "\t--key <name>       \tName of the public ssh key. Default: ${KEY_NAME}"
+    echo -e "\t--packages <list>  \tComma-separated list of extra packages to install"
+    echo -e "\t--no-delete-image  \tDo not delete the given image first"
+    echo -e "\t--no-delete-vm     \tDo not delete the temporary VM afterwards"
+    echo -e "\t-- ...             \tAny other options appearing after the -- will be ignored"
 }
 
 # While there are arguments or '--' is reached
@@ -30,6 +32,8 @@ while [ $# -gt 0 ]; do
         --quiet|-q) VERBOSE=no;;
         --vm) [ -n $2 ] && VM_NAME=$2; shift;;
         --image) [ -n $2 ] && IMAGE_NAME=$2; shift;;
+        --key) [ -n $2 ] && KEY_NAME=$2; shift;;
+        --packages) [ -n $2 ] && PACKAGES="${2//,/ }"; shift;;
         --no-delete-image) DELETE_IMAGE=no;;
         --no-delete-vm) DELETE_VM=no;;
         --help|-h) usage; exit 0;;
@@ -39,6 +43,10 @@ while [ $# -gt 0 ]; do
     shift
 done
 
+[ $VERBOSE == 'no' ] && exec 1>${MM_TMP}/prepare.log
+ORG_FD1=$(tty)
+
+mkdir -p ${MM_TMP}
 
 #######################################################################
 
@@ -59,11 +67,10 @@ while [ -n "$(nova list --minimal | awk '/ '${VM_NAME_TEST}' / {print $2}')" ]; 
     VM_NAME_TEST=${VM_NAME}--$(( _OFFSET++ ))
     echo "Trying ${VM_NAME_TEST} instead."
 done
-[ "$VERBOSE" = "yes" ] && echo "Settling for ${VM_NAME_TEST}."
+echo "Settling for ${VM_NAME_TEST}."
 VM_NAME=${VM_NAME_TEST}
 
-mkdir -p ${INIT_TMP}
-CLOUDINIT_CMDS=${INIT_TMP}/vm_${VM_NAME// /_}.yml
+CLOUDINIT_CMDS=${MM_TMP}/vm_${VM_NAME// /_}.yml
 PORT=$((PORT + _OFFSET))
 
 cat > ${CLOUDINIT_CMDS} <<ENDCLOUDINIT
@@ -89,10 +96,10 @@ runcmd:
   - yum -y install lsof strace jq tcpdump nc cloud-utils-growpart
   - echo '================================================================================'
   - echo "Cloudinit phone home"
-  - curl http://${PHONE_HOME}:$PORT/prepare/ready 2>&1 > /dev/null || true
+  - curl http://${PHONE_HOME}:$PORT/prepare/ready &>/dev/null || true
 ENDCLOUDINIT
 
-cat > ${INIT_TMP}/prepare.py <<ENDREST
+cat > ${MM_TMP}/prepare.py <<ENDREST
 #!/usr/bin/env python
 
 import web
@@ -112,50 +119,91 @@ if __name__ == "__main__":
     app.run()
 ENDREST
 
-[ "$VERBOSE" = "yes" ] && echo "Starting the REST phone home server (on port: ${PORT})"
+########################################################################
+
+function cleanup {
+    fuser -k ${PORT}/tcp > /dev/null || true
+
+    if [ "$DELETE_IMAGE" = "yes" ]; then
+	# For the moment, I delete the image, assuming there is one.
+	# Otherwise, I check if the snapshots have that name,
+	# loop through, get each ID, and delete those.
+	echo "Deleting the '${IMAGE_NAME}' snapshot"
+	nova image-delete "${IMAGE_NAME}"
+    fi
+    
+    if [ "$DELETE_VM" = "yes" ]; then
+	echo "Deleting the '${VM_NAME}' VM"
+	nova delete "${VM_NAME}"  > /dev/null
+    fi
+}
+
+trap "cleanup" INT TERM #EXIT
+########################################################################
+
+echo "Starting the REST phone home server (on port: ${PORT})"
 fuser -k $PORT/tcp || true
-trap "fuser -k ${PORT}/tcp || true" SIGINT SIGTERM EXIT
-python ${INIT_TMP}/prepare.py $PORT &
+python ${MM_TMP}/prepare.py $PORT &
 REST_PID=$!
 
 # Booting a machine, getting a temporary ip from DHCP
 # No need to add ssh-keys, since we won't log onto it
-[ "$VERBOSE" = "yes" ] && echo "Booting a '${VM_NAME}' VM"
+[ -n $PACKAGES ] && WITH_SSH="--security-group ${OS_TENANT_NAME}-sg --key-name ${KEY_NAME}"
+echo "Booting a '${VM_NAME}' VM"
 nova boot --flavor 'm1.small' --image 'CentOS6' \
 --nic net-id=$(neutron net-list --tenant_id=$TENANT_ID | awk '/ '${OS_TENANT_NAME}-mgmt-net' /{print $2}') \
---user-data ${CLOUDINIT_CMDS} "${VM_NAME}"
+${WITH_SSH} --user-data ${CLOUDINIT_CMDS} "${VM_NAME}"
 
-if [ "$DELETE_IMAGE" = "yes" ]; then
-    # For the moment, I delete the image, assuming there is one.
-    # Otherwise, I check if the snapshots have that name,
-    # loop through, get each ID, and delete those.
-    [ "$VERBOSE" = "yes" ] && echo "Deleting the CentOS6-micromosler snapshot"
-    nova image-delete "${IMAGE_NAME}"
-fi
-
-[ "$VERBOSE" = "yes" ] && echo "Waiting for the '${VM_NAME}' VM to be ready."
+echo "Waiting for the '${VM_NAME}' VM to be ready."
 wait ${REST_PID}
-[ "$VERBOSE" = "yes" ] && echo "It just phoned home!"
+#echo "It just phoned home!"
 
-[ "$VERBOSE" = "yes" ] && echo "Stopping it before snapshoting."
+if [ -n $PACKAGES ]; then
+
+    # Associate a floating IP
+    FLOATING_IP=$(nova floating-ip-create public | awk '/ public / {print $4}')
+    nova floating-ip-associate "${VM_NAME}" ${FLOATING_IP}
+    # Configuring the repo for Openstack
+    rsync -avL -e "ssh -l centos -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" lib/_openstack-common/rdo-release.repo ${FLOATING_IP}:.
+    rsync -avL -e "ssh -l centos -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" lib/_openstack-common/RPM-GPG-KEY-Icehouse-SIG ${FLOATING_IP}:.
+    ssh -l centos -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${FLOATING_IP} 'sudo bash -x -e' &>${MM_TMP}/prepare.log <<EOF
+rsync /home/centos/rdo-release.repo /etc/yum.repos.d/rdo-release.repo
+rsync /home/centos/RPM-GPG-KEY-Icehouse-SIG /etc/pki/rpm-gpg/RPM-GPG-KEY-Icehouse-SIG
+yum clean all
+yum -y install rabbitmq-server python-imaging python-qrcode MySQL-python
+yum -y install openstack-nova openstack-nova-compute openstack-neutron openstack-neutron-ml2 python-novaclient python-keystoneclient python-neutronclient python-glanceclient python-heatclient python-neutronclient
+EOF
+
+    # Removing the floating IP
+    nova floating-ip-disassociate "${VM_NAME}" ${FLOATING_IP}
+    nova floating-ip-delete ${FLOATING_IP}
+fi # End extra packages
+
+echo "Stopping it before snapshoting."
 nova stop "${VM_NAME}"
 # Note: There should be only one
 
-T_MAX=10
+T_MAX=10 # seconds
 T=0
 STRIDE=3
-until [ "$(nova show '${VM_NAME}' | awk '/ status / {print $4}')" == 'SHUTOFF' ] || (( T >= T_MAX )) ; do (( T++ )); sleep $STRIDE; done
+until [ "$(nova show \"${VM_NAME}\" | awk '/ status / {print $4}')" == 'SHUTOFF' ] || [ $? -ne 0 ] || (( ++T >= T_MAX ))
+do
+    sleep $STRIDE
+done
+
+cleanup
 
 if (( T < T_MAX )); then
-    [ "$VERBOSE" = "yes" ] && echo "Creating the ${IMAGE_NAME} snapshot"
+    echo "Creating the ${IMAGE_NAME} snapshot"
     nova image-create --poll "${VM_NAME}" "${IMAGE_NAME}"
     
-    if [ "$DELETE_VM" = "yes" ]; then
-	[ "$VERBOSE" = "yes" ] && echo "Deleting the '${VM_NAME}' VM"
-	nova delete "${VM_NAME}"
-    fi
+    ########################################################################
+    exec 1>${ORG_FD1}
     echo "Preparation done"
 else
+    ########################################################################
+    exec 1>${ORG_FD1}
     echo "The '${VM_NAME}' took too long to stop. We waited for $(( T * STRIDE )) seconds."
     echo "Run by hand: nova image-create --poll '${VM_NAME}' '${IMAGE_NAME}'"
 fi
+

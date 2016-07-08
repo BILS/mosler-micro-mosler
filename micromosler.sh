@@ -7,6 +7,7 @@ function usage {
     echo -e "\tclean        \tRemoves allocated resources"
     echo -e "\tsync         \tCopies relevant files to the VMs"
     echo -e "\tprovision    \tConfigures the infracstructure"
+    echo -e "\tprepare      \tPrepares the virtual image to boot from"
 
     echo -e "\nSupply --help (or -h) to see the options for each command"
 
@@ -18,7 +19,7 @@ function usage {
 }
 
 case "$1" in
-    init|clean|sync|provision) _CMD=$1;;
+    init|clean|sync|provision|prepare) _CMD=$1;;
     *) echo "$0: error - unrecognized command $1" 1>&2; usage; exit 1;;
 esac
 shift

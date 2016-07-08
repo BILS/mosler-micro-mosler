@@ -15,7 +15,7 @@ function usage {
     echo -e "\t                       \tWe filter out machines that don't appear in the default list."
     echo -e "\t--vault <name>         \tName of the drop folder in the servers"
     echo -e "\t                       \tDefaults to '${VAULT}'"
-    echo -e "\t--timeout <seconds>,   \tSkips the steps of syncing files to the servers"
+    echo -e "\t--timeout <seconds>,"
     echo -e "\t       -t <seconds>    \tSkips the steps of syncing files to the servers"
     echo -e "\t--quiet,-q             \tRemoves the verbose output"
     echo -e "\t--help,-h              \tOutputs this message and exits"
