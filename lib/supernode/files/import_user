@@ -1,8 +1,5 @@
 #!/bin/sh
 
-echo 'Paste user entry in LDIF:'
-ssh root@ldap import_uppmax_user
-
 echo 'Fixing users for thinlinc.'
 ldapsearch  -h ldap -b ou=Users,dc=mosler,dc=bils,dc=se uid -x | grep ^uid: | while read a b; do
   ssh root@thinlinc-master establish_user "$b" < /dev/null

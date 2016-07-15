@@ -24,13 +24,13 @@ check_and_make_tokenadmin () {
 }
 
 
-for p in `cat /etc/uppmaxconfig/bils_tokenadmins`; do
+for p in `cat /etc/mosler/bils_tokenadmins`; do
   check_and_make_tokenadmin "$p"
 done
 
 keystone user-list | fgrep '@' | while read a username c; do 
 
-  if grep -q "$username" /etc/uppmaxconfig/bils_tokenadmins; then
+  if grep -q "$username" /etc/mosler/bils_tokenadmins; then
     :
   else
     # User not tokenadmin, verify

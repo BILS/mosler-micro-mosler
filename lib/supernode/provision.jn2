@@ -7,41 +7,22 @@ sed -i "/^-A INPUT -m state --state NEW -s {{ env['MGMT_CIDR']|replace('/','\/')
 sed -i "/^-A INPUT -m state --state NEW .*/ i \
 -A INPUT -m state --state NEW -s {{ env['MGMT_CIDR']|replace('/','\/') }} -j ACCEPT" /etc/sysconfig/iptables
 service iptables restart
-    
 
 ##############################################################
-echo "Cron configuration"
+# Mount the nfs share as /meles
+mkdir -p /meles
+if mount | grep -q meles ;then
+    umount /meles
+fi
+mount -t nfs {{ env['NFS_SERVER'] }}:/mnt/nfs /meles
 
-cat > /etc/cron.d/filsluss <<EOF
-*/2 * * * * root flock -n /tmp/filsluss_import_run /usr/local/sbin/filsluss_cron_import 2>/dev/null >/dev/null 
-*/2 * * * * root flock -n /tmp/filsluss_export_run /usr/local/sbin/filsluss_cron_export 2>/dev/null >/dev/null
+if ! grep -q "{{ env['NFS_SERVER'] }}" /etc/fstab; then
+    cat >> /etc/fstab<<EOF
+{{ env['NFS_SERVER'] }}:/mnt/nfs /meles  nfs   auto,noatime,nolock,bg,nfsvers=4,intr,tcp,actimeo=1800 0 0
 EOF
-
-cat > /etc/cron.d/project_mapping <<EOF
-*/15 * * * * root /usr/local/sbin/thinlinc_proj_setup
-EOF
-
-cat > /etc/cron.d/queue <<EOF
-*/8 * * * * root flock -n /tmp/queue_responder /usr/local/bin/queue_responder
-EOF
-
-cat > /etc/cron.d/sync-uppmax <<EOF
-*/10 * * * * root test /tmp/syncexporters -nt /etc/uppmaxconfig/filsluss_exportmembers || flock -n /tmp/syncexporters /usr/local/bin/sync_exporters && touch /tmp/syncexporters
-*/10 * * * * root test /tmp/synctokenadmins -nt /etc/uppmaxconfig/bils_tokenadmins || flock -n /tmp/synctokenadmins /usr/local/bin/sync_tokenadmins && touch /tmp/synctokenadmins 
-*/10 * * * * root test /tmp/syncgrantfile -nt /etc/uppmaxconfig/grantfile || flock -n /tmp/syncgrantfile /usr/local/bin/sync_grantfile && touch /tmp/syncgrantfile
-
-2 2  * * * root flock  /tmp/syncexporters /usr/local/bin/sync_exporters 
-3 3  * * * root flock /tmp/synctokenadmins /usr/local/bin/sync_tokenadmins
-4 4 * * * root flock /tmp/syncgrantfile /usr/local/bin/sync_grantfile 
-EOF
-
-cat > /etc/cron.d/userdata <<EOF
-*/2 * * * * root flock -n /tmp/userdatarun /usr/local/sbin/fix_userdata 2>/dev/null
-* * * * * root flock -n /tmp/hostdatarun /usr/local/sbin/fix_hostdata 2>/dev/null
-EOF
+fi
 
 ##############################################################
-
 # Wait 300 seconds max for neutron-server to be ready
 # Note: this should happen after keystone is ready
 sleep 5 # On the openstack-controller, neutron-server is first closing. Let's sleep
@@ -62,21 +43,12 @@ chmod 0755 /usr/local/heat/mosler-template-parameters
 echo "Creating public subnet network in neutron"
 neutron subnet-create public-net --name public-subnet --allocation-pool start=172.18.0.30,end=172.18.0.200 --disable-dhcp --gateway 172.18.0.1  172.18.0.0/24
 
-
 ##############################################################
-# Mount the nfs share as /meles
-# mkdir -p /meles
-# if mount | grep -q meles ;then
-#     umount /meles
-# fi
-# mount -t nfs {{ env['NFS_SERVER'] }}:/mnt/nfs /meles
+keystone role-create --name heat_stack_user
+# Wait for heat
+wait_port openstack-controller 8000 300
 
-# if ! grep -q "{{ env['NFS_SERVER'] }}" /etc/fstab; then
-#     cat >> /etc/fstab<<EOF
-# {{ env['NFS_SERVER'] }}:/mnt/nfs /meles  nfs   auto,noatime,nolock,bg,nfsvers=4,intr,tcp,actimeo=1800 0 0
-# EOF
-# fi
-
+exit 0 # Exiting early today...
 ##############################################################
 # Create project NBIS. Users come from ldap.
 
@@ -112,9 +84,6 @@ function wait_for_flavors {
     exit 1
 }
 wait_for_flavors 300
-
-echo "Exiting early today..."
-exit 0
 
 if ! keystone tenant-get NBIS; then
     /usr/local/bin/create_project.sh NBIS

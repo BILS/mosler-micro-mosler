@@ -30,8 +30,7 @@ do
     img=/var/lib/glance/images/00000000-0000-0000-0000-00000000000$i
     #rsync -a {{ env['VAULT'] }}/${IMG[$i]} $img
     rm -f $img
-    # Using a hard link. Symbolic link don't work
-    ln /home/centos/{{ env['VAULT'] }}/${IMG[$i]} $img
+    ln /home/centos/{{ env['VAULT'] }}/${IMG[$i]} $img # Using a hard link. Symbolic link don't work
     chown glance:glance $img
     chmod 640 $img
 done

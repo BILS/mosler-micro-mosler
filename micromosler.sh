@@ -19,10 +19,20 @@ function usage {
 }
 
 case "$1" in
-    init|clean|sync|provision|prepare) _CMD=$1;;
+    init|clean|sync|provision|prepare)
+	_CMD=$1
+	shift # Remove the command name from $@
+	export MM_CMD="$0 ${_CMD}"
+	$(dirname ${BASH_SOURCE[0]})/lib/${_CMD}.sh $@ # pass the remaining arguments
+	;;
+    all)
+	echo "Not implemented yet";
+	set -e # exit on error
+	# $0 clean -q
+	# $0 init -i CentOS6-mm-extended -q
+	# $0 sync -q
+	# $0 provision --cheat -q
+	exit 2;;
     *) echo "$0: error - unrecognized command $1" 1>&2; usage; exit 1;;
 esac
-shift
 
-export MM_CMD="$0 ${_CMD}"
-$(dirname ${BASH_SOURCE[0]})/lib/${_CMD}.sh $@

@@ -5,7 +5,6 @@ yum -y install openldap-servers openldap-clients
 
 echo "Copying config files"
 {% set files = [ 'passwd_line',
-		 'import_uppmax_user',
 		 'auth_token',
 		 'pam_auth_token'
 	       ] -%}

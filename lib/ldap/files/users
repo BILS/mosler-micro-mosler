@@ -221,7 +221,7 @@ cn: PI
 sn: 1
 gecos: USER3
 homeDirectory: /home/user3
-mail: user@localhost
+mail: user3@localhost
 uidNumber: 20005
 gidNumber: 20005
 
@@ -240,7 +240,7 @@ cn: Exporter
 sn: 1
 gecos: Exporter3
 homeDirectory: /home/export1
-mail: user@localhost
+mail: export1@localhost
 uidNumber: 20006
 gidNumber: 20006
 

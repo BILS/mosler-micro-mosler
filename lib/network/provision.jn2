@@ -6,7 +6,9 @@ sed -i "/^-A INPUT -m state --state NEW -s {{ env['MGMT_CIDR']|replace('/','\/')
 # Insert it before the other line
 sed -i "/^-A INPUT -m state --state NEW .*/ i \
 -A INPUT -m state --state NEW -s {{ env['MGMT_CIDR']|replace('/','\/') }} -j ACCEPT" /etc/sysconfig/iptables
-service iptables restart
+#service iptables restart # Not sure why this fails sometimes.
+service iptables stop || true
+service iptables start
     
 
 echo "System config"
@@ -32,6 +34,30 @@ ovs-vsctl add-br br-eth1 || true
 
 echo "Adding eth1 to the OVS bridge"
 ovs-vsctl add-port br-eth1 eth1 || true
+
+{% if env['DO_CHEAT'] != 'yes' %}
+echo "Correcting the Nova admin tenant id for Neutron"
+source /root/.keystonerc
+T=0
+while (( ++T < 300 )) ; do
+    nova_admin_tenant_id=$(keystone tenant-list | awk '/ services /{print $2}')
+    [ $? -eq 0 ] && [ -n "${nova_admin_tenant_id}" ] && break;
+    sleep 1
+done
+(( T >= 300 )) && exit 1
+[ -z "${nova_admin_tenant_id}" ] && exit 1
+sed -i -e "s/nova_admin_tenant_id=.*/nova_admin_tenant_id=${nova_admin_tenant_id}/" /etc/neutron/neutron.conf
+{% endif %}
+
+# echo "Deleting the virtual routers"
+# ip netns | while read ns; do ip netns del $ns; done
+echo "Cleaning the logs"
+truncate --size 0 /var/log/neutron/*
+
+# Wait for Message Broker. Don't want to loose the messages
+wait_port openstack-controller 5672 300
+sleep 5 # On the openstack-controller, neutron-server is first closing. Let's sleep
+wait_port openstack-controller 9696 300
 
 echo "Starting Neutron services"
 {% set services = [ 'dhcp-agent',

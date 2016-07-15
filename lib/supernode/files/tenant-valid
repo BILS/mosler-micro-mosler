@@ -3,4 +3,4 @@
 . /root/.keystonerc
 PATH=/usr/local/sbin:$PATH
 
-grep -q "^$1:" /etc/uppmaxconfig/grantfile
+grep -q "^$1:" /etc/mosler/grantfile

@@ -20,7 +20,7 @@ fi
 # Sync users for
 proj="$1"
 
-for p in `grep "^$proj:" /etc/uppmaxconfig/grantfile | sed -e 's/.*://' -e 's/,/ /g'`; do 
+for p in `grep "^$proj:" /etc/mosler/grantfile | sed -e 's/.*://' -e 's/,/ /g'`; do 
   if keystone user-role-list --tenant="$proj" --user="$p" | grep -q _member_; then
     :
   else
@@ -31,7 +31,7 @@ done
 
 keystone user-list | fgrep '@' | while read a username c; do 
 
-  if grep -q "$proj:.*\b${username}\b" /etc/uppmaxconfig/grantfile ; then
+  if grep -q "$proj:.*\b${username}\b" /etc/mosler/grantfile ; then
     :
   else
     # User not tokenadmin, verify

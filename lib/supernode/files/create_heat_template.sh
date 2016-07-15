@@ -195,9 +195,6 @@ while heat stack-list | grep -q "${PROJECT_NAME}.*_IN_PROGRESS" ; do
   sleep 5
 done
 
-echo 'Exiting early today'
-exit 0
-
 /usr/local/bin/heat_add_compute.sh --project ${PROJECT_NAME} --index 1 --flavor mosler.8cores --image project-computenode-stable
 
 # #

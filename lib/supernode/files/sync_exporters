@@ -24,7 +24,7 @@ check_and_make_exporter () {
 }
 
 
-sed -e 's/[:,]/ /g' /etc/uppmaxconfig/filsluss_exportmembers  | while read project users ; do
+sed -e 's/[:,]/ /g' /etc/mosler/filsluss_exportmembers  | while read project users ; do
   for user in $users; do
     check_and_make_exporter "$user" "$project"
   done
@@ -32,7 +32,7 @@ done
 
 keystone user-list | fgrep '@' | while read a username c; do 
   keystone tenant-list | fgrep bils20 | while read d e f tenant g; do
-    if grep "$tenant:.*$username" /etc/uppmaxconfig/filsluss_exportmembers; then
+    if grep "$tenant:.*$username" /etc/mosler/filsluss_exportmembers; then
       :
     else
       # User not tokenadmin, verify

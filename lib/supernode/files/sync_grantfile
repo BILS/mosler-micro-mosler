@@ -13,7 +13,7 @@ fi
 
 source /root/.keystonerc
 
-sed -e 's/:.*//' /etc/uppmaxconfig/grantfile | while read proj; do
+sed -e 's/:.*//' /etc/mosler/grantfile | while read proj; do
   if keystone tenant-get "$proj" >/dev/null 2>/dev/null; then
    :
   else

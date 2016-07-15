@@ -26,8 +26,8 @@ service nfs restart
 echo "Creating NFS share"
 mkdir -p /mnt/nfs
 
-# echo "/mnt/nfs {{ env['MGMT_CIDR'] }}(rw,sync,no_root_squash,no_subtree_check)" > /etc/exports
-# #echo "/mnt/nfs supernode(rw,sync,no_root_squash,no_subtree_check)" > /etc/exports
+echo "/mnt/nfs {{ env['MGMT_CIDR'] }}(rw,sync,no_root_squash,no_subtree_check)" > /etc/exports
+#echo "/mnt/nfs supernode(rw,sync,no_root_squash,no_subtree_check)" > /etc/exports
 
-# exportfs -a
+exportfs -a
 

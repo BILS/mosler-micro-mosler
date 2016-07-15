@@ -20,9 +20,16 @@ if service {{ service }} status; then
 fi
 {% endfor %}
 
+echo "Truncate the log files"
+truncate --size 0 /var/log/nova/*
+truncate --size 0 /var/log/neutron/*
+truncate --size 0 /var/log/heat/*
+
 #############################################################
 
 echo "Starting the Message Broker"
+service rabbitmq-server stop
+[ -f /var/log/rabbitmq/rabbit@openstack-controller.log ] && rm -f /var/log/rabbitmq/rabbit@openstack-controller.log
 service rabbitmq-server start
 chkconfig rabbitmq-server on
 
@@ -100,18 +107,9 @@ echo "Cron configuration"
 (crontab -l -u keystone 2>&1 | grep -q token_flush) || \
 echo '@hourly /usr/bin/keystone-manage token_flush >/var/log/keystone/keystone-tokenflush.log 2>&1' >> /var/spool/cron/keystone
 
-rsync -a {{ env['VAULT'] }}/update_user_password.py  /root/update_user_password.py
-chown root:root /root/update_user_password.py
-chmod 0755 /root/update_user_password.py
-
-cat > /etc/cron.d/update_user_password <<EOF
-# Check for updated passwords once every five minutes
-*/5 * * * * root /root/update_user_password.py
-EOF
-
 source /root/.keystonerc
 function wait_for_compute1 {
-    local -i t=${1:-30} # default: 30 seconds, well...if you don't count the backoff...
+    local -i t=${1:-30} # default: 30 seconds
     local -i backoff=1
     local -i stride=20
     while (( t > 0 )) ; do
@@ -126,4 +124,5 @@ function wait_for_compute1 {
 wait_for_compute1 300
 
 nova aggregate-add-host service-and-login compute1.novalocal
+
 

@@ -23,7 +23,7 @@ staff:2000:20120214:20200214:uppmax:Jukka Komminaho:lka
 testqt:2000:20140730:20300730:uppmax:Lennart Karlsson:lka
 EOF
 
-    grep "^$proj" /etc/uppmaxconfig/grantfile >> "$proj/misc/sw/share/slurm/topolino/grantfile.new"
+    grep "^$proj" /etc/mosler/grantfile >> "$proj/misc/sw/share/slurm/topolino/grantfile.new"
     mv "$proj/misc/sw/share/slurm/topolino/grantfile.new" "$proj/misc/sw/share/slurm/topolino/grantfile"
 
     touch "$proj/misc/etc/hosts.new" 

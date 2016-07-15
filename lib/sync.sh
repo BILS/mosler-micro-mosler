@@ -5,6 +5,7 @@ source $(dirname ${BASH_SOURCE[0]})/settings.sh
 
 export VAULT=vault
 CONNECTION_TIMEOUT=1 #seconds
+WITH_KEY=yes
 
 function usage {
     echo "Usage: ${MM_CMD:-$0} [options]"
@@ -15,6 +16,7 @@ function usage {
     echo -e "\t                       \tWe filter out machines that don't appear in the default list."
     echo -e "\t--vault <name>         \tName of the drop folder in the servers"
     echo -e "\t                       \tDefaults to '${VAULT}'"
+    echo -e "\t--no-key               \tDisables the SSH key generation for supernode"
     echo -e "\t--timeout <seconds>,"
     echo -e "\t       -t <seconds>    \tSkips the steps of syncing files to the servers"
     echo -e "\t--quiet,-q             \tRemoves the verbose output"
@@ -30,6 +32,7 @@ while [ $# -gt 0 ]; do
         --machines|-m) CUSTOM_MACHINES=$2; shift;;
         --vault) VAULT=$2; shift;;
         --timeout|-t) CONNECTION_TIMEOUT=$2; shift;;
+        --no-key) WITH_KEY=no;;
         --) shift; break;;
         *) echo "$0: error - unrecognized option $1" 1>&2; usage; exit 1;;
     esac
@@ -137,6 +140,41 @@ do
 done
 # Wait for all the copying to finish
 for job in ${JOB_PIDS[@]}; do wait ${job} || ((FAIL++)); print_progress; done
+
+########################################################################
+if [ $WITH_KEY = yes ]; then
+    echo -e "\nHandling supernode access to other machines"
+    # If one of the two does not exit, recreate them the key pair.
+    if [ ! -e ${MM_TMP}/ssh_key.${OS_TENANT_NAME} ] || [ -e ${MM_TMP}/ssh_key.${OS_TENANT_NAME}.pub ]; then
+	rm -f ${MM_TMP}/ssh_key.${OS_TENANT_NAME} ${MM_TMP}/ssh_key.${OS_TENANT_NAME}.pub
+	ssh-keygen -q -t rsa -N "" -f ${MM_TMP}/ssh_key.${OS_TENANT_NAME} -C supernode
+    fi
+    cat > ${MM_TMP}/ssh_key.${OS_TENANT_NAME}.config <<EOF
+Host ${MACHINES[@]// /,}
+        User root
+        StrictHostKeyChecking no
+        UserKnownHostsFile /dev/null
+EOF
+    scp -q -F ${SSH_CONFIG} ${MM_TMP}/ssh_key.${OS_TENANT_NAME}* ${FLOATING_IPs[supernode]}:${VAULT}/.
+    ssh -F ${SSH_CONFIG} ${FLOATING_IPs[supernode]} 'sudo bash -e -x 2>&1' <<EOF &>/dev/null
+mv ${VAULT}/ssh_key.${OS_TENANT_NAME} /root/.ssh/id_rsa
+mv ${VAULT}/ssh_key.${OS_TENANT_NAME}.pub /root/.ssh/id_rsa.pub
+mv ${VAULT}/ssh_key.${OS_TENANT_NAME}.config /root/.ssh/config
+chown root:root /root/.ssh/config /root/.ssh/id_rsa /root/.ssh/id_rsa.pub
+chmod 600 /root/.ssh/id_rsa /root/.ssh/config
+chmod 644 /root/.ssh/id_rsa.pub
+EOF
+    for machine in ${MACHINES[@]}
+    do
+	[ "$machine" == "supernode" ] && continue
+	scp -q -F ${SSH_CONFIG} ${MM_TMP}/ssh_key.${OS_TENANT_NAME}.pub ${FLOATING_IPs[$machine]}:${VAULT}/id_rsa.pub
+	ssh -F ${SSH_CONFIG} ${FLOATING_IPs[$machine]} 'sudo bash -e -x 2>&1' <<EOF &>/dev/null
+sudo sed -i -e '/supernode/d' /root/.ssh/authorized_keys
+cat ${VAULT}/id_rsa.pub >> /root/.ssh/authorized_keys
+rm ${VAULT}/id_rsa.pub
+EOF
+    done
+fi
 
 ########################################################################
 exec 1>${ORG_FD1}

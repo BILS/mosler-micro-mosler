@@ -42,11 +42,11 @@ rsync -a --no-perms {{ env['VAULT'] }}/nova.conf                /etc/nova/nova.c
 chown nova:nova /etc/nova/nova.conf
 chmod 644 /etc/nova/nova.conf
 
-rsync -a --no-perms {{ env['VAULT'] }}/glance-api.conf           /etc/glance/glance-api.conf
+rsync -a --no-perms {{ env['VAULT'] }}/glance-api.conf          /etc/glance/glance-api.conf
 chown glance:glance /etc/glance/glance-api.conf
 chmod 644 /etc/glance/glance-api.conf
 
-rsync -a --no-perms {{ env['VAULT'] }}/glance-registry.conf      /etc/glance/glance-registry.conf
+rsync -a --no-perms {{ env['VAULT'] }}/glance-registry.conf     /etc/glance/glance-registry.conf
 chown glance:glance /etc/glance/glance-registry.conf
 chmod 644 /etc/glance/glance-registry.conf
 
@@ -69,3 +69,11 @@ do
     chmod 640 {{ env['VAULT'] }}/$img
 done
 
+rsync -a --no-perms {{ env['VAULT'] }}/update_user_password.py  /root/update_user_password.py
+chown root:root /root/update_user_password.py
+chmod 0755 /root/update_user_password.py
+
+cat > /etc/cron.d/update_user_password <<EOF
+# Check for updated passwords once every five minutes
+*/5 * * * * root /root/update_user_password.py
+EOF
