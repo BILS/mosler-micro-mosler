@@ -5,6 +5,7 @@ echo "Copying Openstack repo, signing key and credentials"
 rsync {{ env['VAULT'] }}/rdo-release.repo /etc/yum.repos.d/rdo-release.repo
 rsync {{ env['VAULT'] }}/RPM-GPG-KEY-Icehouse-SIG /etc/pki/rpm-gpg/RPM-GPG-KEY-Icehouse-SIG
 
+yum install chrony
 
 # systemctl disable firewalld
 # systemctl stop firewalld

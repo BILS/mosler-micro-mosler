@@ -11,10 +11,8 @@ function usage {
 while [ $# -gt 0 ]; do
     case "$1" in
         --help|-h) usage; exit 0;;
-	controller) host='openstack-controller';;
-	thinlinc) host='thinlinc-master';;
 	hnas|nfs) host='storage';;
-	neutron|network) host='networking-node';;
+	network) host='neutron';;
         --) shift; break;;
         *) host=$1;;
     esac

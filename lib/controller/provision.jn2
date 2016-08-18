@@ -1,0 +1,146 @@
+# -*-sh-*-
+
+echo "Stopping Services (if existing)"
+{% set items = [ 'openstack-keystone',
+		 'neutron-server',
+		 'openstack-nova-api',
+		 'openstack-nova-scheduler',
+		 'openstack-nova-conductor',
+		 'openstack-glance-api',
+		 'openstack-glance-registry',
+		 'mysqld'
+] -%}
+{% for service in items %}
+systemctl stop {{ service }}.service
+{% endfor %}
+
+echo "Clean the log files"
+rm -f /var/log/nova/{api,conductor,nova-manage,scheduler}.log
+rm -f /var/log/neutron/server.log
+rm -f /var/log/glance/{api,openstack-glance-api-startup,openstack-glance-registry-startup,registry}.log
+rm -f /var/log/keystone/{keystone,keystone-startup}.log
+
+#############################################################
+echo "NTP configuration"
+
+echo "allow {{ env['MGMT_CIDR'] }}" >> /etc/chrony.conf
+echo "allow {{ env['DATA_CIDR'] }}" >> /etc/chrony.conf
+systemctl enable chronyd.service
+systemctl start chronyd.service
+
+#############################################################
+
+echo "Starting the Message Broker"
+systemctl enable rabbitmq-server.service
+
+systemctl stop rabbitmq-server.service
+[ -f /var/log/rabbitmq/rabbit@openstack-controller.log ] && rm -f /var/log/rabbitmq/rabbit@openstack-controller.log
+systemctl start rabbitmq-server.service
+
+echo "Preparing the RabbitMQ user"
+rabbitmqctl add_user openstack rabbit || true
+rabbitmqctl set_permissions openstack ".*" ".*" ".*"
+
+#############################################################
+
+echo "Configuring iptables"
+# Remove the line
+sed -i "/^-A INPUT -m state --state NEW -s {{ env['MGMT_CIDR']|replace('/','\/') }} -j ACCEPT/ d" /etc/sysconfig/iptables
+# Insert it before the other line
+sed -i "/^-A INPUT -p tcp -m state --state NEW -m tcp --dport 22 -j ACCEPT/ i \
+-A INPUT -m state --state NEW -s {{ env['MGMT_CIDR']|replace('/','\/') }} -j ACCEPT" /etc/sysconfig/iptables
+
+sed -i "/^-A INPUT -m state --state NEW -s {{ env['EXT_CIDR']|replace('/','\/') }} -j ACCEPT/ d" /etc/sysconfig/iptables
+sed -i "/^-A INPUT -p tcp -m state --state NEW -m tcp --dport 22 -j ACCEPT/ i \
+-A INPUT -m state --state NEW -s {{ env['EXT_CIDR']|replace('/','\/') }} -j ACCEPT" /etc/sysconfig/iptables
+
+service iptables restart
+
+#############################################################
+echo "Routing the external network"
+sed -i "/ {{ env['EXT_CIDR']|replace('/','\/') }} / d" /etc/sysconfig/network-scripts/route-eth0
+sed -i "/default via/ i \
+table ext {{ env['EXT_CIDR']|replace('/','\/') }} via {{ env['NEUTRON_SERVER'] }} dev eth0 src {{ env['CONTROLLER'] }}" /etc/sysconfig/network-scripts/route-eth0
+
+sed -i "/ {{ env['EXT_CIDR']|replace('/','\/') }} / d" /etc/sysconfig/network-scripts/rule-eth0
+echo "to {{ env['EXT_CIDR'] }} table ext" >> /etc/sysconfig/network-scripts/rule-eth0
+echo "from {{ env['EXT_CIDR'] }} table ext" >> /etc/sysconfig/network-scripts/rule-eth0
+
+echo "System config"
+## RegExp, Replacement
+{% set lines = [
+	('^\s*net.ipv4.conf.all.rp_filter\s*=.*$',         'net.ipv4.conf.all.rp_filter=0'         ),
+	('^\s*net.ipv4.conf.default.rp_filter\s*=.*$',     'net.ipv4.conf.default.rp_filter=0'     ),
+	('^\s*net.ipv4.conf.eth0.rp_filter\s*=.*$',        'net.ipv4.conf.eth0.rp_filter=0'        ),
+	('^\s*net.ipv6.conf.all.disable_ipv6\s*=.*$',      'net.ipv6.conf.all.disable_ipv6=1'      ),
+	('^\s*net.ipv6.conf.default.disable_ipv6\s*=.*$',  'net.ipv6.conf.default.disable_ipv6=1'  )
+] -%}
+{% for regexp, line in lines %}
+sed -i -e '/{{ regexp }}/ d' /etc/sysctl.conf
+echo '{{ line }}' >> /etc/sysctl.conf
+{% endfor %}
+
+sysctl -p
+service network restart
+
+#############################################################
+echo "Memcached service"
+systemctl enable memcached.service
+systemctl restart memcached.service
+
+#############################################################
+# SSL certificate for Nginx (no password)
+CERT=/etc/nginx/cert
+[ -e ${CERT}.key ] && rm -f ${CERT}.key
+[ -e ${CERT}.pem ] && rm -f ${CERT}.pem
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout ${CERT}.key -out ${CERT}.pem \
+-passin pass:"" -subj "/C=SE/ST=UPPLAND/L=UPPSALA/O=NBIS/OU=SysDev/CN=mosler.se/emailAddress=admin@localhost"
+
+/etc/httpd/conf/httpd.conf
+
+service nginx restart
+chkconfig nginx on
+
+echo "Keystone cron configuration"
+(crontab -l -u keystone 2>&1 | grep -q token_flush) || \
+echo '@hourly /usr/bin/keystone-manage token_flush >/var/log/keystone/keystone-tokenflush.log 2>&1' >> /var/spool/cron/keystone
+
+#############################################################
+echo "MySQL configuration"
+
+echo "Create MySQL configuration file"
+cat > /etc/my.cnf.d/openstack.cnf <<EOF
+[mysqld]
+bind-address = {{ env['DB_SERVER'] }}
+default-storage-engine = innodb
+innodb_file_per_table
+max_connections = 4096
+collation-server = utf8_general_ci
+character-set-server = utf8
+EOF
+
+echo "Removing databases by hand"
+# Or check that: http://hakunin.com/six-ansible-practices#path-to-success-3
+rm -rf /var/lib/mysql
+mkdir --mode=0755 /var/lib/mysql
+chown mysql:mysql /var/lib/mysql
+
+systemctl enable mariadb.service
+systemctl start mariadb.service
+
+echo "Restarting MySQL server"
+service mysqld start
+
+# echo "MySQL root password"
+# /usr/bin/mysqladmin -u root -h localhost password 'mysql'
+# /usr/bin/mysqladmin -u root -h openstack-controller password 'mysql'
+# # Not dropping the .my.cnf file in /root
+
+{% if env['DO_CHEAT'] == 'yes' %}
+{% include 'controller/provision-cheat.jn2' %}
+{% else %}
+{% include 'controller/provision-nocheat.jn2' %}
+mysqldump -u root -pmysql --all-databases --events > /home/centos/db_dump.sql
+echo "In neutron.conf, change nova_admin_tenant_id with $(source /root/.keystonerc && keystone tenant-list | awk '/ services /{print $2}')"
+exit 0
+{% endif %}

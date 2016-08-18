@@ -52,11 +52,13 @@ export PUBLIC_SSH_KEYS=(\
 # Declaring the machines
 
 declare -a MACHINES
-export MACHINES=('supernode' 'compute1' 'compute2' 'compute3' 'storage' 'thinlinc')
+export MACHINES=('supernode' 'controller' 'neutron' 'compute1' 'compute2' 'compute3' 'storage' 'thinlinc')
 
 declare -A FLAVORS
 export FLAVORS=(\
     [supernode]=m1.small \
+    [controller]=m1.small \
+    [neutron]=m1.small \
     [compute1]=m1.large \
     [compute2]=m1.large \
     [compute3]=m1.large \
@@ -66,7 +68,9 @@ export FLAVORS=(\
 
 declare -A MACHINE_IPs
 export MACHINE_IPs=(\
-    [supernode]=172.25.8.6 \
+    [supernode]=172.25.8.4 \
+    [controller]=172.25.8.5 \
+    [neutron]=172.25.8.6 \
     [compute1]=172.25.8.7 \
     [compute2]=172.25.8.8 \
     [compute3]=172.25.8.9 \
@@ -78,6 +82,7 @@ export MGMT_CIDR=172.25.8.0/22
 
 declare -A DATA_IPs
 export DATA_IPs=(\
+    [neutron]=10.10.10.101 \
     [compute1]=10.10.10.110 \
     [compute2]=10.10.10.111 \
     [compute3]=10.10.10.112 \
@@ -86,9 +91,14 @@ export DATA_IPs=(\
 export DATA_GATEWAY=10.10.10.1
 export DATA_CIDR=10.10.10.0/24
 
+# For the external network within the 'over'-openstack
+export EXT_CIDR=172.18.0.0/24
+
 declare -A FLOATING_IPs
 export FLOATING_IPs=(\
-    [supernode]=10.254.0.57 \
+    [supernode]=10.254.0.55 \
+    [controller]=10.254.0.56 \
+    [neutron]=10.254.0.57 \
     [compute1]=10.254.0.58 \
     [compute2]=10.254.0.59 \
     [compute3]=10.254.0.60 \
@@ -108,6 +118,8 @@ PORT=12345
 declare -A PROVISION
 export PROVISION=(\
     [supernode]=supernode \
+    [controller]=controller \
+    [neutron]=network \
     [compute1]=compute \
     [compute2]=compute \
     [compute3]=compute \

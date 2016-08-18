@@ -105,15 +105,15 @@ do
 	    
 	    # Copying all files to the VAULT on that machine
 	    [ -d ${FOLDER}/files ] &&
-		rsync -av -e "ssh -F ${SSH_CONFIG}" ${FOLDER}/files/ ${FLOATING_IPs[$machine]}:${VAULT}/.
+		rsync -avL -e "ssh -F ${SSH_CONFIG}" ${FOLDER}/files/ ${FLOATING_IPs[$machine]}:${VAULT}/.
 	    
-	    # [ "$machine" == "thinlinc-master" ] && [ -d $TL_HOME ] &&
+	    # [ "$machine" == "thinlinc" ] && [ -d $TL_HOME ] &&
 	    # 	rsync -av -e "ssh -F ${SSH_CONFIG}" $TL_HOME/ ${FLOATING_IPs[$machine]}:${VAULT}/.
 	    
-	    # if [ "$machine" == "openstack-controller" ]; then
+	    # if [ "$machine" == "controller" ]; then
 	    # 	for img in project-computenode-stable project-loginnode-stable topolino-q-stable; do
 	    # 	    [ -f ${MOSLER_IMAGES}/$img ] &&
-	    # 		rsync -av --no-perms -e "ssh -F ${SSH_CONFIG}" ${MOSLER_IMAGES}/$img ${FLOATING_IPs[openstack-controller]}:${VAULT}/.
+	    # 		rsync -av --no-perms -e "ssh -F ${SSH_CONFIG}" ${MOSLER_IMAGES}/$img ${FLOATING_IPs[$machine]}:${VAULT}/.
 	    # 	done
 	    # fi
 	    

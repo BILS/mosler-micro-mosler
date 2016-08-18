@@ -1,5 +1,0 @@
-#!/bin/sh
-
-user="$1"
-
-getent passwd "$user" >/dev/null || /usr/sbin/adduser --shell /sbin/nologin "$user"

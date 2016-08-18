@@ -1,0 +1,146 @@
+# -*-sh-*-
+
+echo "Configuring iptables"
+sed -i "/^-A INPUT -m state --state NEW -s {{ env['MGMT_CIDR']|replace('/','\/') }} -j ACCEPT/ d" /etc/sysconfig/iptables
+sed -i "/^-A INPUT -m state --state NEW -s {{ env['EXT_CIDR']|replace('/','\/') }} -j ACCEPT/ d" /etc/sysconfig/iptables
+# Insert it before the other line
+sed -i "/^-A INPUT -m state --state NEW -m tcp -p tcp --dport 22 -j ACCEPT/ i \
+-A INPUT -m state --state NEW -s {{ env['MGMT_CIDR']|replace('/','\/') }} -j ACCEPT" /etc/sysconfig/iptables
+sed -i "/^-A INPUT -m state --state NEW -m tcp -p tcp --dport 22 -j ACCEPT/ i \
+-A INPUT -m state --state NEW -s {{ env['EXT_CIDR']|replace('/','\/') }} -j ACCEPT" /etc/sysconfig/iptables
+
+#service iptables restart # Not sure why this fails sometimes.
+service iptables stop || true
+service iptables start
+
+echo "System config"
+## RegExp, Replacement
+{% set lines = [
+	('^\s*net.ipv4.ip_forward\s*=.*$',                 'net.ipv4.ip_forward=1'                 ),
+	('^\s*net.ipv4.conf.all.rp_filter\s*=.*$',         'net.ipv4.conf.all.rp_filter=0'         ),
+	('^\s*net.ipv4.conf.default.rp_filter\s*=.*$',     'net.ipv4.conf.default.rp_filter=0'     ),
+	('^\s*net.ipv4.conf.eth0.rp_filter\s*=.*$',        'net.ipv4.conf.eth0.rp_filter=0'        ),
+	('^\s*net.ipv4.conf.eth1.rp_filter\s*=.*$',        'net.ipv4.conf.eth1.rp_filter=0'        ),
+	('^\s*net.bridge.bridge-nf-call-arptables\s*=.*$', 'net.bridge.bridge-nf-call-arptables=0' ),
+	('^\s*net.bridge.bridge-nf-call-iptables\s*=.*$',  'net.bridge.bridge-nf-call-iptables=0'  ),
+	('^\s*net.bridge.bridge-nf-call-ip6tables\s*=.*$', 'net.bridge.bridge-nf-call-ip6tables=0' ),
+	('^\s*net.ipv6.conf.all.disable_ipv6\s*=.*$',      'net.ipv6.conf.all.disable_ipv6=1'      ),
+	('^\s*net.ipv6.conf.default.disable_ipv6\s*=.*$',  'net.ipv6.conf.default.disable_ipv6=1'  ),
+	('^\s*net.ipv4.conf.br-eth1.proxy_arp\s*=.*$',     'net.ipv4.conf.br-eth1.proxy_arp=0'     )
+] -%}
+{% for regexp, line in lines %}
+sed -i -e '/{{ regexp }}/ d' /etc/sysctl.conf
+echo '{{ line }}' >> /etc/sysctl.conf
+{% endfor %}
+
+# Activating kernel configurations (or use -e too)
+sysctl -e -p
+    
+CIDR={{ env['EXT_CIDR'] }}
+
+mkdir -p /etc/sysconfig/network-scripts/org
+[ ! -e /etc/sysconfig/network-scripts/org/ifcfg-eth1 ] && cp /etc/sysconfig/network-scripts/ifcfg-eth1 /etc/sysconfig/network-scripts/org/ifcfg-eth1
+[ ! -e /etc/sysconfig/network-scripts/org/route-eth1 ] && cp /etc/sysconfig/network-scripts/route-eth1 /etc/sysconfig/network-scripts/org/route-eth1
+[ ! -e /etc/sysconfig/network-scripts/org/rule-eth1 ] && cp /etc/sysconfig/network-scripts/rule-eth1 /etc/sysconfig/network-scripts/org/rule-eth1
+
+BR_GATEWAY=${CIDR%.0/24}.1
+BR_PREFIX=${CIDR##*/}
+
+IPADDR=$(grep -r 'IPADDR=' /etc/sysconfig/network-scripts/org/ifcfg-eth1 | sed 's/IPADDR\s*=\s*//')
+PREFIX=$(grep -r 'PREFIX=' /etc/sysconfig/network-scripts/org/ifcfg-eth1 | sed 's/PREFIX\s*=\s*//')
+GATEWAY=$(grep -r 'GATEWAY=' /etc/sysconfig/network-scripts/org/ifcfg-eth1 | sed 's/GATEWAY\s*=\s*//')
+    
+cat > /etc/sysconfig/network-scripts/ifcfg-eth1 <<EOF
+#TYPE=Ethernet
+DEVICETYPE=ovs
+TYPE=OVSPort
+BOOTPROTO=none
+OVS_BRIDGE=br-eth1
+NAME=eth1
+DEVICE=eth1
+ONBOOT=yes
+MTU=1450
+EOF
+
+cat > /etc/sysconfig/network-scripts/ifcfg-br-eth1 <<EOF
+DEVICE=br-eth1
+NAME=br-eth1
+ONBOOT=yes
+BOOTPROTO=none
+IPADDR=${IPADDR}
+PREFIX=${PREFIX}
+GATEWAY=${GATEWAY}
+IPADDR2=${BR_GATEWAY}
+PREFIX2=${BR_PREFIX}
+MTU=1450
+DEFROUTE=no
+DEVICETYPE=ovs
+TYPE=OVSBridge
+EOF
+
+# Rules
+cat > /etc/sysconfig/network-scripts/rule-br-eth1.tmp <<EOF
+to $CIDR lookup ext
+from $CIDR lookup ext
+EOF
+cat /etc/sysconfig/network-scripts/rule-br-eth1.tmp /etc/sysconfig/network-scripts/org/rule-eth1 > /etc/sysconfig/network-scripts/rule-br-eth1
+rm -f /etc/sysconfig/network-scripts/rule-br-eth1.tmp
+rm -f /etc/sysconfig/network-scripts/rule-eth1
+
+# Routes
+cat > /etc/sysconfig/network-scripts/route-br-eth1.tmp <<EOF
+table ext $CIDR dev br-eth1 src ${BR_GATEWAY}
+table ext blackhole default
+EOF
+sed 's/eth1/br-eth1/g' /etc/sysconfig/network-scripts/org/route-eth1 >> /etc/sysconfig/network-scripts/route-br-eth1.tmp
+mv -f /etc/sysconfig/network-scripts/route-br-eth1.tmp /etc/sysconfig/network-scripts/route-br-eth1
+rm -f /etc/sysconfig/network-scripts/route-eth1
+
+echo "Restarting network to bring up the bridge used by Openstack"
+service network restart
+
+###############################################################
+echo "Create MySQL configuration file"
+cat > /etc/my.cnf.d/openstack.cnf <<EOF
+[mysqld]
+bind-address = {{ env['NEUTRON_DB_SERVER'] }}
+default-storage-engine = innodb
+innodb_file_per_table
+max_connections = 4096
+collation-server = utf8_general_ci
+character-set-server = utf8
+EOF
+
+echo "Removing databases by hand"
+# Or check that: http://hakunin.com/six-ansible-practices#path-to-success-3
+rm -rf /var/lib/mysql
+mkdir --mode=0755 /var/lib/mysql
+chown mysql:mysql /var/lib/mysql
+
+systemctl enable mariadb.service
+systemctl start mariadb.service
+
+echo "Restarting MySQL server"
+service mysqld start
+
+###############################################################
+sleep 10 # On the controller, services are first closing. Let's sleep
+# Wait for Message Broker. Don't want to loose the messages
+wait_port controller 5672 300
+wait_port controller 9696 300
+
+# Cleaning the logs
+rm -f /var/log/neutron/{dhcp-agent,l3-agent,metadata-agent,openvswitch-agent}.log
+rm -f /var/log/neutron/neutron-ns-metadata-proxy-*
+#rm -rf /var/lib/neutron/dhcp/*
+
+echo "Starting Neutron services"
+{% set services = [ 'dhcp-agent',
+		    'l3-agent',
+		    'openvswitch-agent',
+		    'metadata-agent',
+] -%}
+{% for service in services %}
+systemctl enable neutron-{{ service }}.service
+systemctl restart neutron-{{ service }}.service
+{% endfor %}

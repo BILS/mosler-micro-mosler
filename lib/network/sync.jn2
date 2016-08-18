@@ -1,0 +1,36 @@
+# -*-sh-*-
+
+#############################################################
+echo "Copying Openstack repo, signing key and credentials"
+rsync {{ env['VAULT'] }}/keystonerc /root/.keystonerc
+
+
+echo "Install Mysql package"
+yum -y install mariadb mariadb-server python2-PyMySQL
+
+
+echo "Openstack python clients"
+yum -y install python-neutronclient
+
+#############################################################
+
+echo "Openstack Components"
+yum -y install openvswitch iproute
+yum -y install openstack-neutron openstack-neutron-ml2
+yum -y install openstack-neutron-openvswitch
+
+
+#############################################################
+echo "Copying config files"
+
+
+if [ -f /etc/neutron/plugin.ini ]; then
+    rm /etc/neutron/plugin.ini
+fi
+ln -s /etc/neutron/plugins/ml2/ml2_conf.ini /etc/neutron/plugin.ini
+
+if [ ! -f /etc/init.d/neutron-openvswitch-agent.orig ]; then
+    cp /etc/init.d/neutron-openvswitch-agent /etc/init.d/neutron-openvswitch-agent.orig
+    sed -i 's,plugins/openvswitch/ovs_neutron_plugin.ini,plugin.ini,g' /etc/init.d/neutron-openvswitch-agent
+fi
+

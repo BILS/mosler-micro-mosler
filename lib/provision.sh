@@ -91,6 +91,8 @@ echo -e "Configuring servers:"
 FAIL=0
 reset_progress
 print_progress
+export DB_SERVER=${MACHINE_IPs[controller]}      # Used in the templates
+export NEUTRON_DB_SERVER=${MACHINE_IPs[neutron]} # 
 #export NFS_SERVER=${MACHINE_IPs[storage]}
 
 # set -e # exit in errors
@@ -153,6 +155,17 @@ print_progress # to have a clear picture
 if (( FAIL > 0 )); then
     oups "\a\n${FAIL} servers failed to be configured"
 else
+    ########################################################################
+    echo -ne "\nAdding the mac address of the external bridge from the Neutron node"
+    TENANT_ID=$(openstack project list | awk "/${OS_TENANT_NAME}/ {print \$2}")
+    DATA_SUBNET=$(neutron subnet-list --tenant_id=${TENANT_ID} | awk "/ ${OS_TENANT_NAME}-data-subnet /{print \$2}")
+    ( set -e # new shell, new env, exit if it errors on the way
+      PORT_ID=$(neutron port-list | awk "/$DATA_SUBNET/ && /${DATA_IPs[neutron]}/ {print \$2}")
+      MAC_ADDR=$(ssh -F ${SSH_CONFIG} ${FLOATING_IPs[neutron]} '/sbin/ip link show dev br-eth1' | awk '/ether/ {print $2}')
+      [ $? -eq 0 ] && [ ! -z "${PORT_ID}" ] && \
+	  neutron port-update ${PORT_ID} --allowed-address-pairs type=dict list=true ip_address=${DATA_CIDR},mac_address=${MAC_ADDR} >/dev/null
+      echo -e $' \e[32m\xE2\x9C\x93\e[0m'    # ok (checkmark)
+    ) || echo -e $' \e[31m\xE2\x9C\x97\e[0m' # fail (cross)
     # Finally...
-    thumb_up "\nServers configured"
+    thumb_up "Servers configured"
 fi

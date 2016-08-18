@@ -6,3 +6,10 @@ sed -i "/^-A INPUT -m state --state NEW -s {{ env['MGMT_CIDR']|replace('/','\/')
 sed -i "/^-A INPUT -p tcp -m state --state NEW -m tcp --dport 22 -j ACCEPT/ i \
 -A INPUT -m state --state NEW -s {{ env['MGMT_CIDR']|replace('/','\/') }} -j ACCEPT" /etc/sysconfig/iptables
 systemctl restart iptables
+
+
+sed -i '/server controller iburst/ d' /etc/chrony.conf
+echo 'server controller iburst' >> /etc/chrony.conf
+
+systemctl enable chronyd.service
+systemctl restart chronyd.service
