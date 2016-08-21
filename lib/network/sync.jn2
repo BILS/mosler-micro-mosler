@@ -1,13 +1,36 @@
 # -*-sh-*-
 
+# Disabling SElinux
+sed -i 's/SELINUX=.*/SELINUX=disabled/' /etc/selinux/config
+
 #############################################################
-echo "Copying Openstack repo, signing key and credentials"
-rsync {{ env['VAULT'] }}/keystonerc /root/.keystonerc
+# On CentOS, the extras repository provides the RPM that enables the
+# OpenStack repository. CentOS includes the extras repository by
+# default, so you can simply install the package to enable the
+# OpenStack repository.
+yum -y install centos-release-openstack-mitaka
 
+yum -y upgrade
 
-echo "Install Mysql package"
+#yum -y install openstack-utils
+
+#############################################################
+echo "NTP packages"
+yum -y install chrony
+
+#############################################################
+echo "Ditch firewalld and use iptables"
+# systemctl disable firewalld
+# systemctl stop firewalld
+# systemctl mask firewalld
+
+yum -y install iptables-services
+systemctl enable iptables
+
+#############################################################
 yum -y install mariadb mariadb-server python2-PyMySQL
-
+yum -y install rabbitmq-server
+yum -y install memcached python-memcached
 
 echo "Openstack python clients"
 yum -y install python-neutronclient
@@ -15,22 +38,43 @@ yum -y install python-neutronclient
 #############################################################
 
 echo "Openstack Components"
-yum -y install openvswitch iproute
-yum -y install openstack-neutron openstack-neutron-ml2
-yum -y install openstack-neutron-openvswitch
-
+#yum -y install iproute
+yum -y install openstack-neutron openstack-neutron-ml2 openstack-neutron-linuxbridge ebtables ipset
 
 #############################################################
 echo "Copying config files"
 
+declare -A FILES=(\
+['neutron.conf']='/etc/neutron/neutron.conf' \
+['ml2_conf.ini']='/etc/neutron/plugins/ml2/ml2_conf.ini' \
+['linuxbridge_agent.ini']='/etc/neutron/plugins/ml2/linuxbridge_agent.ini' \
+['l3_agent.ini']='/etc/neutron/l3_agent.ini' \
+['metadata_agent.ini']='/etc/neutron/metadata_agent.ini' \
+['dhcp_agent.ini']='/etc/neutron/dhcp_agent.ini' \
+)
+#['dnsmasq-neutron.conf']='/etc/neutron/dnsmasq-neutron.conf'
+for f in ${!FILES[@]}
+do
+    rsync -a --no-perms {{ env['VAULT'] }}/$f ${FILES[$f]}
+    chown neutron:neutron ${FILES[$f]}
+    chmod 644 ${FILES[$f]}
+done
+
+rsync -a --no-perms {{ env['VAULT'] }}/admin.rc /root/admin.rc
+chown root:root /root/admin.rc
+chmod 600 /root/admin.rc
+
+rsync -a --no-perms {{ env['VAULT'] }}/ifup-veth /etc/sysconfig/network-scripts/ifup-veth
+chown root:root /etc/sysconfig/network-scripts/ifup-veth
+chmod 755 /etc/sysconfig/network-scripts/ifup-veth
+
+rsync -a --no-perms {{ env['VAULT'] }}/ifdown-veth /etc/sysconfig/network-scripts/ifdown-veth
+chown root:root /etc/sysconfig/network-scripts/ifdown-veth
+chmod 755 /etc/sysconfig/network-scripts/ifdown-veth
 
 if [ -f /etc/neutron/plugin.ini ]; then
     rm /etc/neutron/plugin.ini
 fi
 ln -s /etc/neutron/plugins/ml2/ml2_conf.ini /etc/neutron/plugin.ini
 
-if [ ! -f /etc/init.d/neutron-openvswitch-agent.orig ]; then
-    cp /etc/init.d/neutron-openvswitch-agent /etc/init.d/neutron-openvswitch-agent.orig
-    sed -i 's,plugins/openvswitch/ovs_neutron_plugin.ini,plugin.ini,g' /etc/init.d/neutron-openvswitch-agent
-fi
 

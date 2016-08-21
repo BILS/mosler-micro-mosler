@@ -139,7 +139,7 @@ done
 for job in ${JOB_PIDS[@]}; do wait ${job} || ((FAIL++)); print_progress; done
 
 ########################################################################
-if [ $WITH_KEY = yes ]; then
+if [ $WITH_KEY = yes ] && [[ " ${MACHINES[@]} " =~ " supernode " ]]; then # if contains supernode
     echo -e "\nHandling supernode access to other machines"
     # If one of the two does not exit, recreate them the key pair.
     if [ ! -e ${MM_TMP}/ssh_key ] || [ -e ${MM_TMP}/ssh_key.pub ]; then
@@ -152,7 +152,7 @@ Host ${MACHINES[@]// /,} tos1
         StrictHostKeyChecking no
         UserKnownHostsFile /dev/null
 EOF
-    scp -q -F ${SSH_CONFIG} ${MM_TMP}/ssh_key* ${FLOATING_IPs[supernode]}:${VAULT}/.
+    scp -q -F ${SSH_CONFIG} ${MM_TMP}/ssh_key.config ${MM_TMP}/ssh_key ${MM_TMP}/ssh_key.pub ${FLOATING_IPs[supernode]}:${VAULT}/.
     ssh -F ${SSH_CONFIG} ${FLOATING_IPs[supernode]} 'sudo bash -e -x 2>&1' <<EOF &>/dev/null
 mv ${VAULT}/ssh_key /root/.ssh/id_rsa
 mv ${VAULT}/ssh_key.pub /root/.ssh/id_rsa.pub

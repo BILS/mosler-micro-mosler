@@ -96,6 +96,7 @@ fi # End cleaning if ALL
 if [ -d ${MM_TMP} ]; then
     echo "Cleaning the temporary folders"
     rm -rf ${MM_TMP}
+    rmdir ${MM_HOME}/tmp &>/dev/null # if tmp is empty
 fi
 
 echo "Cleaning done"

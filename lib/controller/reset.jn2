@@ -1,29 +1,26 @@
 # -*-sh-*-
 
-sed -i "/allow {{ env['MGMT_CIDR']|replace('/','\/') }}/ d" /etc/chrony.conf
-sed -i "/allow {{ env['DATA_CIDR']|replace('/','\/') }}/ d" /etc/chrony.conf
-
 # Stopping Services (if existing)
-{% set items = [ 'openstack-keystone',
-		 'neutron-server',
-		 'openstack-nova-api',
+{% set items = [ 'openstack-nova-api',
 		 'openstack-nova-scheduler',
 		 'openstack-nova-conductor',
 		 'openstack-glance-api',
 		 'openstack-glance-registry',
-		 'mysqld'
+		 'mariadb',
+		 'httpd'
 ] -%}
 {% for service in items %}
-if service {{ service }} status; then
-  service {{ service }} stop   
+if systemctl status {{ service }}.service; then
+  systemctl stop {{ service }}.service
+  systemctl disable {{ service }}.service
 fi
 {% endfor %}
 
 # Clean the log files
 rm -f /var/log/nova/{api,conductor,nova-manage,scheduler}.log
-rm -f /var/log/neutron/server.log
 rm -f /var/log/glance/{api,openstack-glance-api-startup,openstack-glance-registry-startup,registry}.log
-rm -f /var/log/keystone/{keystone,keystone-startup}.log
+rm -f /var/log/keystone/keystone.log
+rm -f /var/log/httpd/keystone-{access,error}.log
 
 # Problem with Nova...
 rm -rf /var/lib/nova/tmp/
@@ -36,24 +33,39 @@ systemctl disable rabbitmq-server
 
 #############################################################
 
-echo "Configuring iptables"
-# Remove the line
-sed -i "/^-A INPUT -m state --state NEW -s {{ env['MGMT_CIDR']|replace('/','\/') }} -j ACCEPT/ d" /etc/sysconfig/iptables
-sed -i "/^-A INPUT -m state --state NEW -s {{ env['EXT_CIDR']|replace('/','\/') }} -j ACCEPT/ d" /etc/sysconfig/iptables
+# declare -a FILES
+# FILES=('/etc/sysconfig/iptables' \
+#        '/etc/selinux/config' \
+#        '/etc/chrony.conf' \
+#        '/etc/sysconfig/network-scripts/route-eth0' \
+#        '/etc/sysconfig/network-scripts/rule-eth0' \
+#        '/etc/sysctl.conf' \
+#        '/etc/nova/nova.conf' \
+#        '/etc/keystone/keystone.conf' \
+#        '/etc/keystone/keystone-paste.ini' \
+# )
+# BACKUP_DIR=~/backup
+# mkdir -p $BACKUP_DIR
+# for f in ${FILES[@]}
+# do
+#     D=$(dirname $f)
+#     F=$(basename $f)
+#     LOC=${BACKUP_DIR}/$D
+#     mkdir -p $LOC
+#     if [ -f $f ] && [ ! -f $LOC/$F ]; then
+# 	/bin/cp -f $f $LOC/$F
+#     fi
+# done
 
-service iptables restart
 
 #############################################################
-echo "Routing Mosler's external network"
-sed -i "/ {{ env['EXT_CIDR']|replace('/','\/') }} / d" /etc/sysconfig/network-scripts/route-eth0
-sed -i "/ {{ env['EXT_CIDR']|replace('/','\/') }} / d" /etc/sysconfig/network-scripts/rule-eth0
-
-service network restart
+systemctl restart iptables
+systemctl restart network
 
 #############################################################
 # Memcached service
-service memcached stop
-chkconfig memcached off
+systemctl disable memcached
+systemctl stop memcached
 
 #############################################################
 # SSL certificate for Nginx (no password)
@@ -61,38 +73,28 @@ CERT=/etc/nginx/cert
 rm -f ${CERT}.key
 rm -f ${CERT}.pem
 
-service nginx stop
-chkconfig nginx off
+systemctl disable nginx
+systemctl stop nginx
 
 #############################################################
 # MySQL
-cat > /etc/my.cnf <<EOF
-[mysqld]
-datadir=/var/lib/mysql
-socket=/var/lib/mysql/mysql.sock
-user=mysql
-# Disabling symbolic-links is recommended to prevent assorted security risks
-symbolic-links=0
+systemctl disable mysql
+systemctl stop mysql
 
-[mysqld_safe]
-log-error=/var/log/mysqld.log
-pid-file=/var/run/mysqld/mysqld.pid
-EOF
-
-# Or check that: http://hakunin.com/six-ansible-practices#path-to-success-3
 rm -rf /var/lib/mysql
 mkdir --mode=0755 /var/lib/mysql
 chown mysql:mysql /var/lib/mysql
+rm -f /etc/my.cnf.d/openstack.cnf
 
-service mysqld stop
-chkconfig mysqld off
 
 #############################################################
 # Glance
 rm -rf /var/lib/glance/image-cache
+rm -rf /var/lib/glance/images
 mkdir -p /var/lib/glance/images
 chown glance:glance /var/lib/glance/images
 
 #############################################################
-# Cron 
+# Keystone
 rm -f /var/spool/cron/keystone
+rm -f /etc/httpd/conf.d/wsgi-keystone.conf

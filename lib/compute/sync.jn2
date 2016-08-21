@@ -1,11 +1,10 @@
 # -*-sh-*-
 
-#############################################################
-echo "Copying Openstack repo, signing key and credentials"
-rsync {{ env['VAULT'] }}/rdo-release.repo /etc/yum.repos.d/rdo-release.repo
-rsync {{ env['VAULT'] }}/RPM-GPG-KEY-Icehouse-SIG /etc/pki/rpm-gpg/RPM-GPG-KEY-Icehouse-SIG
+# Disabling SElinux
+sed -i 's/SELINUX=.*/SELINUX=disabled/' /etc/selinux/config
 
-yum install chrony
+#############################################################
+yum -y install chrony
 
 # systemctl disable firewalld
 # systemctl stop firewalld
@@ -14,4 +13,35 @@ yum install chrony
 yum -y install iptables-services
 systemctl enable iptables
 
+#############################################################
+# On CentOS, the extras repository provides the RPM that enables the
+# OpenStack repository. CentOS includes the extras repository by
+# default, so you can simply install the package to enable the
+# OpenStack repository.
+yum -y install centos-release-openstack-mitaka
 
+yum -y upgrade
+
+#yum -y install openstack-utils
+
+yum -y install openstack-nova-compute openstack-neutron-linuxbridge ebtables ipset
+
+
+ 
+rsync -a --no-perms {{ env['VAULT'] }}/nova.conf /etc/nova/nova.conf
+chown nova:nova /etc/nova/nova.conf
+chmod 644 /etc/nova/nova.conf
+
+rsync -a --no-perms {{ env['VAULT'] }}/neutron.conf /etc/neutron/neutron.conf
+chown neutron:neutron /etc/neutron/neutron.conf
+chmod 644 /etc/neutron/neutron.conf
+
+rsync -a --no-perms {{ env['VAULT'] }}/linuxbridge_agent.ini /etc/neutron/plugins/ml2/linuxbridge_agent.ini
+chown neutron:neutron /etc/neutron/plugins/ml2/linuxbridge_agent.ini
+chmod 644 /etc/neutron/plugins/ml2/linuxbridge_agent.ini
+
+
+if [ -f /etc/neutron/plugin.ini ]; then
+    rm /etc/neutron/plugin.ini
+fi
+ln -s /etc/neutron/plugins/ml2/linuxbridge_agent.ini /etc/neutron/plugin.ini

@@ -4,13 +4,13 @@
 source $(dirname ${BASH_SOURCE[0]})/settings.sh
 
 # Default values
-_ALL=no
+_NET=no
 _IMAGE=CentOS7
 
 function usage {
     echo "Usage: ${MM_CMD:-$0} [options]"
     echo -e "\noptions are"
-    echo -e "\t--all,-a         \tCreates also networks, routers, security groups and floating IPs"
+    echo -e "\t--net            \tCreates also networks, routers, security groups and floating IPs"
     echo -e "\t--machines <list>,"
     echo -e "\t        -m <list>\tA comma-separated list of machines"
     echo -e "\t                 \tDefaults to: \"${MACHINES[@]// /,}\"."
@@ -25,7 +25,7 @@ function usage {
 # While there are arguments or '--' is reached
 while [ $# -gt 0 ]; do
     case "$1" in
-        --all|-a) _ALL=yes;;
+        --net) _NET=yes;;
         --quiet|-q) VERBOSE=no;;
         --machines|-m) CUSTOM_MACHINES=$2; shift;;
         --image|-i) _IMAGE=$2; shift;;
@@ -101,7 +101,7 @@ if [ -z "$EXTNET_ID" ]; then
     exit 1
 fi
 
-if [ ${_ALL} = "yes" ]; then
+if [ ${_NET} = "yes" ]; then
 
     echo "Creating routers and networks"
 
@@ -150,7 +150,7 @@ if [ ${_ALL} = "yes" ]; then
 
     #nova quota fixing
 
-fi # End _ALL config
+fi # End _NET config
 
 
 # Testing if the image exists
@@ -200,7 +200,8 @@ echo "Making sudo not require TTY for the centos user"
 echo 'Defaults:centos !requiretty' > /etc/sudoers.d/centos
 echo "================================================================================"
 echo "Disabling SElinux"
-sed -i 's/SELINUX=.*/SELINUX=disabled/' /etc/sysconfig/selinux
+[ -f /etc/sysconfig/selinux ] && sed -i 's/SELINUX=.*/SELINUX=disabled/' /etc/sysconfig/selinux
+[ -f /etc/selinux/config ] && sed -i 's/SELINUX=.*/SELINUX=disabled/' /etc/selinux/config
 echo "================================================================================"
 echo "Adding the routing tables"
 echo '10 mgmt' >> /etc/iproute2/rt_tables
@@ -339,7 +340,7 @@ do
 done
 
 ########################################################################
-# Allowing external network ${EXT_CIDR} from the neutron back to the openstack-controller
+# Allowing external network ${EXT_CIDR} from the neutron back to the controller
 # We update the port corresponding to eth0 on the neutron node, so that the bridge can talk back to the controller.
 # 
 echo -n "Handling external network ${EXT_CIDR} within Openstack"

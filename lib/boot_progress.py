@@ -27,7 +27,6 @@ class update:
         for k, v in machines.items():
             if v != 'ready':
                 return 'Still waiting for %s to be ready' % k
-        print('Everybody is ready. Exiting the server')
         sys.exit(0)
 
 if __name__ == "__main__":

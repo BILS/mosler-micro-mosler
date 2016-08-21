@@ -1,0 +1,43 @@
+#!/bin/bash
+
+# Author: Frédéric Haziza
+#   Date: August 2016
+
+. /etc/init.d/functions
+
+cd /etc/sysconfig/network-scripts
+. ./network-functions
+
+[ -f ../network ] && . ../network
+
+CONFIG=$1
+
+source_config
+
+. /etc/sysconfig/network
+
+# Check to make sure the device is actually up
+check_device_down ${DEVICE} && exit 0
+
+# we can't just delete the configured address because that address
+# may have been changed in the config file since the device was
+# brought up.  Flush all addresses associated with this
+# instance instead.
+if [ -d "/sys/class/net/${DEVICE}" ]; then
+    /sbin/ip addr flush dev ${DEVICE} scope global 2>/dev/null
+    /sbin/ip link set dev ${PATCH} down 2>/dev/null
+    /sbin/ip link set dev ${DEVICE} down 2>/dev/null
+fi
+
+[ "$retcode" = "0" ] && retcode=$?
+
+# Deleting the patch/tap (that also deletes ${DEVICE})
+/sbin/ip link delete ${PATCH} type ${TYPE}
+
+if [ "$retcode" = 0 ] ; then
+    /etc/sysconfig/network-scripts/ifdown-post $CONFIG
+    # do NOT use $? because ifdown should return whether or not
+    # the interface went down.
+fi
+
+exit $retcode

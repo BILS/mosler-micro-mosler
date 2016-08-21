@@ -1,0 +1,33 @@
+#!/bin/bash
+
+# Author: Frédéric Haziza
+#   Date: August 2016
+
+. /etc/init.d/functions
+
+cd /etc/sysconfig/network-scripts
+. ./network-functions
+
+[ -f ../network ] && . ../network
+
+CONFIG=$1
+
+need_config ${CONFIG}
+
+source_config
+
+# Creating a veth pair so that Openstack adds on side to its
+# external bridge, but doesn't flush the IP and routes
+# (since they'll be on the other side of the pair)
+/sbin/ip -4 link add ${PATCH} type ${TYPE} peer name ${NAME}
+
+/sbin/ip -4 link set dev ${PATCH} promisc on
+/sbin/ip -4 link set dev ${NAME} promisc on
+
+/sbin/ip -4 addr add ${IPADDR}/${PREFIX} dev ${NAME}
+
+/sbin/ip -4 link set dev ${PATCH} up
+/sbin/ip -4 link set dev ${NAME} up
+
+# Taking care of the routes
+exec /etc/sysconfig/network-scripts/ifup-post ${CONFIG} $2

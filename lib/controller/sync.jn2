@@ -1,11 +1,9 @@
 # -*-sh-*-
 
-#############################################################
-echo "Copying Openstack repo, signing key and credentials"
-# rsync {{ env['VAULT'] }}/rdo-release.repo /etc/yum.repos.d/rdo-release.repo
-# rsync {{ env['VAULT'] }}/RPM-GPG-KEY-Icehouse-SIG /etc/pki/rpm-gpg/RPM-GPG-KEY-Icehouse-SIG
-rsync {{ env['VAULT'] }}/keystonerc /root/.keystonerc
+# Disabling SElinux
+sed -i 's/SELINUX=.*/SELINUX=disabled/' /etc/selinux/config
 
+#############################################################
 # On CentOS, the extras repository provides the RPM that enables the
 # OpenStack repository. CentOS includes the extras repository by
 # default, so you can simply install the package to enable the
@@ -15,6 +13,7 @@ yum -y install centos-release-openstack-mitaka
 yum -y upgrade
 
 #yum -y install openstack-selinux
+yum -y install python-openstackclient
 
 #############################################################
 echo "NTP packages"
@@ -40,19 +39,25 @@ yum -y install rabbitmq-server
 yum -y install memcached python-memcached
 
 
-
 #############################################################
-echo "Openstack python clients"
-yum -y install python-openstackclient
-#python-novaclient python-keystoneclient python-neutronclient python-glanceclient python-heatclient python-neutronclient MySQL-python
-
 echo "Openstack Components"
-yum -y install openstack-keystone httpd mod_wsgi
+yum -y install openstack-keystone httpd mod_wsgi openstack-glance \
+openstack-nova-api openstack-nova-conductor openstack-nova-console openstack-nova-novncproxy openstack-nova-scheduler
 
-yum -y install openstack-nova openstack-neutron openstack-neutron-ml2 \
-openstack-dashboard openstack-keystone openstack-glance memcached
+echo "Openstack python clients"
+#yum -y install python-neutronclient
 
-echo "Copying config files"
+yum -y install openstack-utils
+
+# yum -y install openstack-nova openstack-neutron openstack-neutron-ml2 \
+# openstack-dashboard openstack-keystone openstack-glance memcached
+
+# echo "Copying config files"
+rsync -a --no-perms {{ env['VAULT'] }}/admin.rc                 /root/admin.rc
+chmod 600 /root/admin.rc
+rsync -a --no-perms {{ env['VAULT'] }}/demo.rc                  /root/demo.rc
+chmod 600 /root/demo.rc
+
 rsync -a --no-perms {{ env['VAULT'] }}/keystone.conf            /etc/keystone/keystone.conf
 chown keystone:keystone /etc/keystone/keystone.conf
 chmod 644 /etc/keystone/keystone.conf
@@ -60,14 +65,6 @@ chmod 644 /etc/keystone/keystone.conf
 rsync -a --no-perms {{ env['VAULT'] }}/wsgi-keystone.conf       /etc/httpd/conf.d/wsgi-keystone.conf
 chown root:root /etc/httpd/conf.d/wsgi-keystone.conf
 chmod 644 /etc/httpd/conf.d/wsgi-keystone.conf
-
-rsync -a --no-perms {{ env['VAULT'] }}/neutron.conf             /etc/neutron/neutron.conf
-chown neutron:neutron /etc/neutron/neutron.conf
-chmod 644 /etc/neutron/neutron.conf
-
-rsync -a --no-perms {{ env['VAULT'] }}/ml2.ini                  /etc/neutron/plugins/ml2/ml2.ini
-chown neutron:neutron /etc/neutron/plugins/ml2/ml2.ini
-chmod 644 /etc/neutron/plugins/ml2/ml2.ini
 
 rsync -a --no-perms {{ env['VAULT'] }}/nova.conf                /etc/nova/nova.conf
 chown nova:nova /etc/nova/nova.conf
@@ -81,14 +78,7 @@ rsync -a --no-perms {{ env['VAULT'] }}/glance-registry.conf     /etc/glance/glan
 chown glance:glance /etc/glance/glance-registry.conf
 chmod 644 /etc/glance/glance-registry.conf
 
-rsync -a --no-perms {{ env['VAULT'] }}/local_settings           /etc/openstack-dashboard/local_settings
-
-
-if [ -f /etc/neutron/plugin.ini ]; then
-    rm /etc/neutron/plugin.ini
-fi
-ln -s /etc/neutron/plugins/ml2/ml2.ini /etc/neutron/plugin.ini
-
+# rsync -a --no-perms {{ env['VAULT'] }}/local_settings           /etc/openstack-dashboard/local_settings
 
 # rsync -a --no-perms {{ env['VAULT'] }}/map_thinlinc_nginx       /usr/local/sbin/map_thinlinc_nginx
 # chown root:root /usr/local/sbin/map_thinlinc_nginx
@@ -97,3 +87,33 @@ ln -s /etc/neutron/plugins/ml2/ml2.ini /etc/neutron/plugin.ini
 # rsync -a --no-perms {{ env['VAULT'] }}/nginx_tl_template.conf   /usr/local/etc/nginx_tl_template.conf
 # chown root:root /usr/local/etc/nginx_tl_template.conf
 # chmod 644 /usr/local/etc/nginx_tl_template.conf
+
+
+# declare -a FILES
+# FILES=('/etc/sysconfig/iptables' \
+#        '/etc/selinux/config' \
+#        '/etc/chrony.conf' \
+#        '/etc/sysconfig/network-scripts/route-eth0' \
+#        '/etc/sysconfig/network-scripts/rule-eth0' \
+#        '/etc/sysctl.conf' \
+#        '/etc/nova/nova.conf' \
+#        '/etc/keystone/keystone.conf' \
+#        '/etc/keystone/keystone-paste.ini' \
+#        '/etc/glance/glance-api.conf' \
+#        '/etc/glance/glance-registry.conf' \
+# )
+# BACKUP_DIR=~/backup
+# mkdir -p $BACKUP_DIR
+# for f in ${FILES[@]}
+# do
+#     D=$(dirname $f)
+#     F=$(basename $f)
+#     LOC=${BACKUP_DIR}/$D
+#     mkdir -p $LOC
+#     if [ -f $f ] && [ ! -f $LOC/$F ]; then
+# 	/bin/cp -f $f $LOC/$F
+#     fi
+# done
+
+
+

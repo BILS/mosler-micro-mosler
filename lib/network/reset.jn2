@@ -8,17 +8,8 @@ service iptables start
 
 for f in ifcfg route rule
 do
-    # cp is 'cp -i', so I call /bin/cp
-    [ -e /etc/sysconfig/network-scripts/org/${f}-eth1 ] && /bin/cp -f /etc/sysconfig/network-scripts/org/${f}-eth1 /etc/sysconfig/network-scripts/${f}-eth1
-    rm -f /etc/sysconfig/network-scripts/${f}-br-eth1
+    rm -f /etc/sysconfig/network-scripts/${f}-veth1
 done
-
-# OpenVSwitch
-ovs-vsctl del-br br-eth1 || true
-ovs-vsctl del-br br-int || true
-ovs-vsctl emer-reset
-service openvswitch stop
-chkconfig openvswitch off
 
 ip rule del from {{ env['MGMT_CIDR'] }} lookup mgmt || true
 ip rule del to {{ env['MGMT_CIDR'] }} lookup mgmt || true
@@ -29,27 +20,21 @@ ip rule del to {{ env['DATA_CIDR'] }} lookup data || true
 ip rule del from {{ env['EXT_CIDR'] }} lookup ext || true
 ip rule del to {{ env['EXT_CIDR'] }} lookup ext || true
 
-service network restart
+systemctl restart network
 
 # Starting Neutron services
-{% set services = [ 'dhcp-agent',
-		    'l3-agent',
-		    'openvswitch-agent',
-		    'metadata-agent',
-		    'ovs-cleanup'
-] -%}
-{% for service in services %}
-chkconfig neutron-{{ service }} off
-if service neutron-{{ service }} status; then
-    service neutron-{{ service }} stop
-fi
-{% endfor %}
+for service in server dhcp-agent l3-agent linuxbridge-agent metadata-agent; do
+    systemctl disable neutron-{{ service }}.service
+    if systemctl status neutron-{{ service }}.service; then
+	systemctl stop neutron-{{ service }}.service
+    fi
+done
 
 # Cleaning the logs
-rm -f /var/log/neutron/{dhcp-agent,l3-agent,metadata-agent,openvswitch-agent}.log
-rm -f /var/log/neutron/neutron-ns-metadata-proxy-*
-
-rm -rf /var/lib/neutron/dhcp/*
+rm -f /var/log/neutron/*.log
+# rm -f /var/log/neutron/{dhcp-agent,l3-agent,metadata-agent,openvswitch-agent}.log
+# rm -f /var/log/neutron/neutron-ns-metadata-proxy-*
+# rm -rf /var/lib/neutron/dhcp/*
 
 # Cleaning old namespaces
 pkill dnsmasq || true
