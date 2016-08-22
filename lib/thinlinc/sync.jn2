@@ -1,9 +1,9 @@
 # -*-sh-*-
 
-echo "Installing Thinlinc packages"
+# Installing Thinlinc packages
 yum -y install {{ env['VAULT'] }}/*x86_64.rpm {{ env['VAULT'] }}/*noarch.rpm xauth inotify-tools
 
-echo "Copying config files"
+# Copying config files
 {% set files = [ 'auth_token',
 		 'establish_user',
 		 'mapproj',
@@ -17,9 +17,6 @@ rsync -a {{ env['VAULT'] }}/{{ file }}  /usr/local/sbin/{{ file }}
 chown root:root /usr/local/sbin/{{ file }}
 chmod 0755 /usr/local/sbin/{{ file }}
 {% endfor %}
-
-# Not found
-# /usr/local/sbin/ssh_auth_token
 
 rsync -a {{ env['VAULT'] }}/sshd /etc/pam.d/sshd
 chown root:root /etc/pam.d/sshd

@@ -1,7 +1,26 @@
 # -*-sh-*-
 
+# Configuring iptables
+# Remove the line
+sed -i "/^-A INPUT -m state --state NEW -s {{ env['MGMT_CIDR']|replace('/','\/') }} -j ACCEPT/ d" /etc/sysconfig/iptables
+# Insert it before the other line
+sed -i "/^-A INPUT -p tcp -m state --state NEW -m tcp --dport 22 -j ACCEPT/ i \
+-A INPUT -m state --state NEW -s {{ env['MGMT_CIDR']|replace('/','\/') }} -j ACCEPT" /etc/sysconfig/iptables
+systemctl restart iptables
+
+#############################################################
+
+sed -i '/server controller iburst/ d' /etc/chrony.conf
+echo 'server controller iburst' >> /etc/chrony.conf
+systemctl enable chronyd.service
+systemctl restart chronyd.service
+
+#############################################################
+
 # echo "Setting up Thinlinc"
 # /opt/thinlinc/sbin/tl-setup -a {{ env['VAULT'] }}/tl_answers
 
 # echo "Configuring Thinlinc web access"
 # sed -i 's/^listen=.*$/listen=443/' /opt/thinlinc/etc/conf.d/webaccess.hconf
+
+
