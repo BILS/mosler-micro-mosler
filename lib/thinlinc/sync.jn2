@@ -1,31 +1,7 @@
 # -*-sh-*-
 
-# Installing Thinlinc packages
-yum -y install {{ env['VAULT'] }}/*x86_64.rpm {{ env['VAULT'] }}/*noarch.rpm xauth inotify-tools
-
-# Copying config files
-{% set files = [ 'auth_token',
-		 'establish_user',
-		 'mapproj',
-		 'pam_auth_token',
-		 'project',
-		 'projectallowed',
-		 'vsmconfigurator.sh'
-	       ] -%}
-{% for file in files %}
-rsync -a {{ env['VAULT'] }}/{{ file }}  /usr/local/sbin/{{ file }}
-chown root:root /usr/local/sbin/{{ file }}
-chmod 0755 /usr/local/sbin/{{ file }}
-{% endfor %}
-
-rsync -a {{ env['VAULT'] }}/sshd /etc/pam.d/sshd
-chown root:root /etc/pam.d/sshd
-chmod 0644 /etc/pam.d/sshd
-
-rsync -a {{ env['VAULT'] }}/thinlinc /etc/pam.d/thinlinc
-chown root:root /etc/pam.d/thinlinc
-chmod 0644 /etc/pam.d/thinlinc
-
+# Disabling SElinux
+sed -i 's/SELINUX=.*/SELINUX=disabled/' /etc/selinux/config
 
 # systemctl disable firewalld
 # systemctl stop firewalld
@@ -33,3 +9,7 @@ chmod 0644 /etc/pam.d/thinlinc
 
 yum -y install iptables-services
 systemctl enable iptables
+
+yum -y install chrony
+
+yum -y install nc nmap tcpdump

@@ -1,12 +1,19 @@
 # -*-sh-*-
 
-
-echo "Configuring iptables"
+# Configuring iptables
+# Remove the line
 sed -i "/^-A INPUT -m state --state NEW -s {{ env['MGMT_CIDR']|replace('/','\/') }} -j ACCEPT/ d" /etc/sysconfig/iptables
 # Insert it before the other line
 sed -i "/^-A INPUT -p tcp -m state --state NEW -m tcp --dport 22 -j ACCEPT/ i \
 -A INPUT -m state --state NEW -s {{ env['MGMT_CIDR']|replace('/','\/') }} -j ACCEPT" /etc/sysconfig/iptables
 systemctl restart iptables
+
+#############################################################
+
+sed -i '/server controller iburst/ d' /etc/chrony.conf
+echo 'server controller iburst' >> /etc/chrony.conf
+systemctl enable chronyd.service
+systemctl restart chronyd.service
 
 ##############################################################
 # Mount the nfs share as /meles
@@ -31,6 +38,53 @@ fi
 # For for glance
 wait_port controller 9292 300
 
-echo "Adding the cirros image to Glance"
-glance image-create --name "cirros" --file /home/centos/{{ env['VAULT'] }}/cirros.img --disk-format qcow2 --container-format bare --is-public True
+# Adding the cirros image to Glance
+source /root/admin.rc
+openstack image list | awk "/cirros/ {print \$2}" | while read i; do openstack image delete $i; done
+
+openstack image create "cirros" --file /home/centos/{{ env['VAULT'] }}/cirros.img --disk-format qcow2 --container-format bare --public
+
+wait_port controller 5000 300
+
+source /root/demo.rc
+
+openstack network create ${OS_PROJECT_NAME}-net
+openstack router create ${OS_PROJECT_NAME}-router --project ${OS_PROJECT_NAME}
+openstack router gateway-set ${OS_PROJECT_NAME}-router public-net
+neutron subnet-create --name ${OS_PROJECT_NAME}-subnet --gateway 192.168.10.1 --enable-dhcp ${OS_PROJECT_NAME}-net 192.168.10.0/24
+neutron router-interface-add ${OS_PROJECT_NAME}-router ${OS_PROJECT_NAME}-subnet
+
+if [ ! -e ~/ssh_key.${OS_PROJECT_NAME} ] || [ -e ~/ssh_key.${OS_PROJECT_NAME}.pub ]; then
+    rm -f ~/ssh_key.${OS_PROJECT_NAME} ~/ssh_key.${OS_PROJECT_NAME}.pub
+    ssh-keygen -q -t rsa -N "" -f ~/ssh_key.${OS_PROJECT_NAME} -C ${OS_PROJECT_NAME}
+fi
+openstack keypair create --public-key ~/ssh_key.${OS_PROJECT_NAME}.pub ${OS_PROJECT_NAME}-key
+
+openstack security group rule create --proto icmp default
+openstack security group rule create --proto tcp --dst-port 22 default
+
+NET_ID=$(openstack network list | awk '/ '${OS_PROJECT_NAME}'-net /{print $2}')
+
+openstack server create --flavor mosler.1core --image cirros \
+--nic net-id=$NET_ID --security-group default \
+--availability-zone serv-login \
+--key-name ${OS_PROJECT_NAME}-key \
+${OS_PROJECT_NAME}-service-node
+
+openstack server create --flavor mosler.1core --image cirros \
+--nic net-id=$NET_ID --security-group default \
+--availability-zone serv-login \
+--key-name ${OS_PROJECT_NAME}-key \
+${OS_PROJECT_NAME}-login-node
+
+openstack server create --flavor mosler.1core --image cirros \
+--nic net-id=$NET_ID --security-group default \
+--availability-zone nova \
+--key-name ${OS_PROJECT_NAME}-key \
+${OS_PROJECT_NAME}-compute-node
+
+
+FIP=$(openstack ip floating create public-net | awk '/ ip /{print $4}')
+sleep 10
+openstack ip floating add $FIP ${OS_PROJECT_NAME}-login-node 
 

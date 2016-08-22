@@ -12,15 +12,17 @@ yum -y install centos-release-openstack-mitaka
 
 yum -y upgrade
 
+yum -y install nc nmap tcpdump
+
 #yum -y install openstack-selinux
 yum -y install python-openstackclient
 
 #############################################################
-echo "NTP packages"
-yum install chrony
+# NTP packages
+yum -y install chrony
 
 #############################################################
-echo "Ditch firewalld and use iptables"
+## Ditch firewalld and use iptables
 # systemctl disable firewalld
 # systemctl stop firewalld
 # systemctl mask firewalld

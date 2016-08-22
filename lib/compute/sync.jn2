@@ -22,7 +22,9 @@ yum -y install centos-release-openstack-mitaka
 
 yum -y upgrade
 
-#yum -y install openstack-utils
+yum -y install nc nmap tcpdump
+
+yum -y install openstack-utils
 
 yum -y install openstack-nova-compute openstack-neutron-linuxbridge ebtables ipset
 

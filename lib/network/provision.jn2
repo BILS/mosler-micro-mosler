@@ -34,6 +34,13 @@ echo '{{ line }}' >> /etc/sysctl.conf
 sysctl -e -p
 
 #################################################################
+
+sed -i '/server controller iburst/ d' /etc/chrony.conf
+echo 'server controller iburst' >> /etc/chrony.conf
+systemctl enable chronyd.service
+systemctl restart chronyd.service
+
+#################################################################
     
 CIDR={{ env['EXT_CIDR'] }}
 

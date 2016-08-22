@@ -1,5 +1,13 @@
 # -*-sh-*-
 
+# Block all incoming connections for the moment
+systemctl start iptables
+iptables -I INPUT 1 -m state --state RELATED,ESTABLISHED -j ACCEPT
+iptables -I INPUT 2 -i lo -j ACCEPT
+iptables -I INPUT 3 -j DROP
+
+#iptables -I OUTPUT 1 -o lo -j ACCEPT
+
 # Stopping Services (if existing)
 {% set items = [ 'openstack-nova-api',
 		 'openstack-nova-scheduler',
@@ -44,7 +52,7 @@ sed -i "/allow {{ env['DATA_CIDR']|replace('/','\/') }}/ d" /etc/chrony.conf
 echo "allow {{ env['DATA_CIDR'] }}" >> /etc/chrony.conf
 
 systemctl enable chronyd.service
-systemctl start chronyd.service
+systemctl restart chronyd.service
 
 #############################################################
 # Starting the Message Broker
@@ -61,7 +69,7 @@ rabbitmqctl set_permissions openstack ".*" ".*" ".*"
 # Routing the external network
 sed -i "/ {{ env['EXT_CIDR']|replace('/','\/') }} / d" /etc/sysconfig/network-scripts/route-eth0
 sed -i "/default via/ i \
-table ext {{ env['EXT_CIDR']|replace('/','\/') }} via {{ env['NEUTRON_SERVER'] }} dev eth0 src {{ env['CONTROLLER'] }}" /etc/sysconfig/network-scripts/route-eth0
+table ext {{ env['EXT_CIDR']|replace('/','\/') }} via {{ env['NEUTRON_IP'] }} dev eth0 src {{ env['CONTROLLER_IP'] }}" /etc/sysconfig/network-scripts/route-eth0
 
 sed -i "/ {{ env['EXT_CIDR']|replace('/','\/') }} / d" /etc/sysconfig/network-scripts/rule-eth0
 echo "to {{ env['EXT_CIDR'] }} table ext" >> /etc/sysconfig/network-scripts/rule-eth0

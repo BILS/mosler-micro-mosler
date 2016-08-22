@@ -1,6 +1,11 @@
 # -*-sh-*-
 
-echo "Installing NFS utils"
+# Disabling SElinux
+sed -i 's/SELINUX=.*/SELINUX=disabled/' /etc/selinux/config
+
+yum -y install nc nmap tcpdump
+
+# Installing NFS utils
 yum -y install nfs-utils nfs-utils-lib
 
 
@@ -16,3 +21,6 @@ systemctl enable rpcbind
 systemctl enable nfs-server
 # systemctl enable nfs-lock
 # systemctl enable nfs-idmap
+
+
+yum -y install chrony

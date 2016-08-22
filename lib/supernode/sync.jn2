@@ -1,12 +1,10 @@
 # -*-sh-*-
 
-#############################################################
-echo "Copying Openstack repo, signing key and credentials"
-rsync {{ env['VAULT'] }}/rdo-release.repo /etc/yum.repos.d/rdo-release.repo
-rsync {{ env['VAULT'] }}/RPM-GPG-KEY-Icehouse-SIG /etc/pki/rpm-gpg/RPM-GPG-KEY-Icehouse-SIG
+# Disabling SElinux
+sed -i 's/SELINUX=.*/SELINUX=disabled/' /etc/selinux/config
 
-yum -y install nc nfs-utils
-yum -y install iptables-services
+#############################################################
+
 
 # systemctl disable firewalld
 # systemctl stop firewalld
@@ -18,3 +16,27 @@ systemctl enable iptables
 
 yum -y install nfs-utils
 systemctl enable rpcbind
+
+
+yum -y install chrony
+
+#############################################################
+# On CentOS, the extras repository provides the RPM that enables the
+# OpenStack repository. CentOS includes the extras repository by
+# default, so you can simply install the package to enable the
+# OpenStack repository.
+yum -y install centos-release-openstack-mitaka
+
+yum -y upgrade
+
+yum -y install nc nmap tcpdump
+
+#yum -y install openstack-selinux
+yum -y install python-openstackclient
+# yum -y install python-glanceclient python-neutronclient python-novaclient
+
+
+rsync -a --no-perms {{ env['VAULT'] }}/admin.rc                 /root/admin.rc
+chmod 600 /root/admin.rc
+rsync -a --no-perms {{ env['VAULT'] }}/demo.rc                  /root/demo.rc
+chmod 600 /root/demo.rc
