@@ -1,15 +1,6 @@
 # -*-sh-*-
 
-# Disabling SElinux
-sed -i 's/SELINUX=.*/SELINUX=disabled/' /etc/selinux/config
+yum -y install nc nmap tcpdump chrony iptables-services
 
-# systemctl disable firewalld
-# systemctl stop firewalld
-# systemctl mask firewalld
-
-yum -y install iptables-services
 systemctl enable iptables
 
-yum -y install chrony
-
-yum -y install nc nmap tcpdump

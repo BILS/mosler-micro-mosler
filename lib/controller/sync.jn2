@@ -1,8 +1,5 @@
 # -*-sh-*-
 
-# Disabling SElinux
-sed -i 's/SELINUX=.*/SELINUX=disabled/' /etc/selinux/config
-
 #############################################################
 # On CentOS, the extras repository provides the RPM that enables the
 # OpenStack repository. CentOS includes the extras repository by
@@ -12,14 +9,14 @@ yum -y install centos-release-openstack-mitaka
 
 yum -y upgrade
 
-yum -y install nc nmap tcpdump
+yum -y install nc nmap tcpdump chrony iptables-services mariadb mariadb-server python2-PyMySQL rabbitmq-server memcached python-memcached
 
-#yum -y install openstack-selinux
-yum -y install python-openstackclient
 
 #############################################################
-# NTP packages
-yum -y install chrony
+# Openstack Components
+yum -y install openstack-utils python-openstackclient openstack-keystone httpd mod_wsgi openstack-dashboard openstack-glance \
+openstack-nova-api openstack-nova-conductor openstack-nova-console openstack-nova-novncproxy openstack-nova-scheduler
+#yum -y install openstack-selinux
 
 #############################################################
 ## Ditch firewalld and use iptables
@@ -27,32 +24,7 @@ yum -y install chrony
 # systemctl stop firewalld
 # systemctl mask firewalld
 
-yum -y install iptables-services
 systemctl enable iptables
-
-#############################################################
-echo "Install Mysql package"
-yum -y install mariadb mariadb-server python2-PyMySQL
-
-echo "RabbitMQ server"
-yum -y install rabbitmq-server
-
-
-yum -y install memcached python-memcached
-
-
-#############################################################
-echo "Openstack Components"
-yum -y install openstack-keystone httpd mod_wsgi openstack-glance \
-openstack-nova-api openstack-nova-conductor openstack-nova-console openstack-nova-novncproxy openstack-nova-scheduler
-
-echo "Openstack python clients"
-#yum -y install python-neutronclient
-
-yum -y install openstack-utils
-
-# yum -y install openstack-nova openstack-neutron openstack-neutron-ml2 \
-# openstack-dashboard openstack-keystone openstack-glance memcached
 
 # echo "Copying config files"
 rsync -a --no-perms {{ env['VAULT'] }}/admin.rc                 /root/admin.rc

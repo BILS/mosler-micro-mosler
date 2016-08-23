@@ -1,40 +1,14 @@
 # -*-sh-*-
 
-# Disabling SElinux
-sed -i 's/SELINUX=.*/SELINUX=disabled/' /etc/selinux/config
+yum -y install nc nmap tcpdump iptables-services nfs-utils chrony
 
-#############################################################
-
-
-# systemctl disable firewalld
-# systemctl stop firewalld
-# systemctl mask firewalld
-
-yum -y install iptables-services
 systemctl enable iptables
-
-
-yum -y install nfs-utils
 systemctl enable rpcbind
 
-
-yum -y install chrony
-
-#############################################################
-# On CentOS, the extras repository provides the RPM that enables the
-# OpenStack repository. CentOS includes the extras repository by
-# default, so you can simply install the package to enable the
-# OpenStack repository.
 yum -y install centos-release-openstack-mitaka
-
 yum -y upgrade
-
-yum -y install nc nmap tcpdump
-
 #yum -y install openstack-selinux
 yum -y install python-openstackclient
-# yum -y install python-glanceclient python-neutronclient python-novaclient
-
 
 rsync -a --no-perms {{ env['VAULT'] }}/admin.rc                 /root/admin.rc
 chmod 600 /root/admin.rc

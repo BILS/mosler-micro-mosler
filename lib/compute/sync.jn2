@@ -1,35 +1,15 @@
 # -*-sh-*-
 
-# Disabling SElinux
-sed -i 's/SELINUX=.*/SELINUX=disabled/' /etc/selinux/config
-
-#############################################################
-yum -y install chrony
-
-# systemctl disable firewalld
-# systemctl stop firewalld
-# systemctl mask firewalld
-
-yum -y install iptables-services
-systemctl enable iptables
-
-#############################################################
-# On CentOS, the extras repository provides the RPM that enables the
-# OpenStack repository. CentOS includes the extras repository by
-# default, so you can simply install the package to enable the
-# OpenStack repository.
 yum -y install centos-release-openstack-mitaka
 
 yum -y upgrade
 
-yum -y install nc nmap tcpdump
+yum -y install nc nmap tcpdump chrony iptables-services
 
-yum -y install openstack-utils
+yum -y install openstack-utils openstack-nova-compute openstack-neutron-linuxbridge ebtables ipset
 
-yum -y install openstack-nova-compute openstack-neutron-linuxbridge ebtables ipset
+systemctl enable iptables
 
-
- 
 rsync -a --no-perms {{ env['VAULT'] }}/nova.conf /etc/nova/nova.conf
 chown nova:nova /etc/nova/nova.conf
 chmod 644 /etc/nova/nova.conf
