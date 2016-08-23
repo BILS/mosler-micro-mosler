@@ -198,6 +198,7 @@ echo 'Europe/Stockholm' > /etc/timezone
 echo "================================================================================"
 echo "Making sudo not require TTY for the centos user"
 echo 'Defaults:centos !requiretty' > /etc/sudoers.d/centos
+echo 'Defaults:root !requiretty' >> /etc/sudoers.d/centos
 echo "================================================================================"
 echo "Disabling SElinux"
 [ -f /etc/sysconfig/selinux ] && sed -i 's/SELINUX=.*/SELINUX=disabled/' /etc/sysconfig/selinux

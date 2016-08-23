@@ -97,7 +97,12 @@ runcmd:
   - pip --proxy http://130.238.7.178:3128 install --upgrade pip
   - echo '================================================================================'
   - echo "Installing packages we always want"
-  - yum -y install lsof strace jq tcpdump nmap nc cloud-utils-growpart
+  - yum -y install lsof strace jq tcpdump nmap nc cloud-utils-growpart chrony iptables-services
+  - echo '================================================================================'
+  - echo "Installing Openstack packages"
+  - yum -y install centos-release-openstack-mitaka
+  - yum -y upgrade
+  - yum -y install mariadb mariadb-server python2-PyMySQL rabbitmq-server memcached python-memcached openstack-utils python-openstackclient openstack-keystone httpd mod_wsgi openstack-dashboard openstack-glance openstack-nova-api openstack-nova-conductor openstack-nova-console openstack-nova-novncproxy openstack-nova-scheduler
   - echo '================================================================================'
   - echo "Cloudinit phone home"
   - curl http://${PHONE_HOME}:$PORT/prepare/ready &>/dev/null || true

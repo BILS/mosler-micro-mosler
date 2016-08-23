@@ -147,13 +147,13 @@ if [ $WITH_KEY = yes ] && [[ " ${MACHINES[@]} " =~ " supernode " ]]; then # if c
 	ssh-keygen -q -t rsa -N "" -f ${MM_TMP}/ssh_key -C supernode
     fi
     cat > ${MM_TMP}/ssh_key.config <<EOF
-Host ${MACHINES[@]// /,} tos1
+Host ${MACHINES[@]// /,}
         User root
         StrictHostKeyChecking no
         UserKnownHostsFile /dev/null
 EOF
     scp -q -F ${SSH_CONFIG} ${MM_TMP}/ssh_key.config ${MM_TMP}/ssh_key ${MM_TMP}/ssh_key.pub ${FLOATING_IPs[supernode]}:${VAULT}/.
-    ssh -F ${SSH_CONFIG} ${FLOATING_IPs[supernode]} 'sudo bash -e -x 2>&1' <<EOF &>/dev/null
+    ssh -F ${SSH_CONFIG} ${FLOATING_IPs[supernode]} 'sudo bash -e -x 2>&1' <<EOF >/dev/null
 mv ${VAULT}/ssh_key /root/.ssh/id_rsa
 mv ${VAULT}/ssh_key.pub /root/.ssh/id_rsa.pub
 mv ${VAULT}/ssh_key.config /root/.ssh/config
@@ -165,10 +165,10 @@ EOF
     do
 	[ "$machine" == "supernode" ] && continue
 	scp -q -F ${SSH_CONFIG} ${MM_TMP}/ssh_key.pub ${FLOATING_IPs[$machine]}:${VAULT}/id_rsa.pub
-	ssh -F ${SSH_CONFIG} ${FLOATING_IPs[$machine]} 'sudo bash -e -x 2>&1' <<EOF &>/dev/null
-sudo sed -i -e '/supernode/d' /root/.ssh/authorized_keys
+	ssh -F ${SSH_CONFIG} ${FLOATING_IPs[$machine]} 'sudo bash -e -x 2>&1' <<EOF >/dev/null
+sed -i -e '/supernode/d' /root/.ssh/authorized_keys
 cat ${VAULT}/id_rsa.pub >> /root/.ssh/authorized_keys
-rm ${VAULT}/id_rsa.pub
+#rm ${VAULT}/id_rsa.pub
 EOF
     done
 fi
