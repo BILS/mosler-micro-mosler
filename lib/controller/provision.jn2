@@ -140,15 +140,7 @@ chown keystone:keystone /var/log/keystone/keystone.log
 #############################################################
 # MySQL configuration
 
-#systemctl stop mariadb.service
-systemctl stop mysqld.service
-# removing mariadb
-yum --no-deps remove $(yum list installed | awk '/mariadb/ {printf "%s ",$1}')
-yum --no-deps remove $(yum list installed | awk '/mysql/ {printf "%s ",$1}')
-# removing mariadb
-yum install http://www.percona.com/downloads/percona-release/redhat/0.1-3/percona-release-0.1-3.noarch.rpm
-yum install Percona-Server-server-57
-
+systemctl stop mariadb.service
 cat > /etc/my.cnf.d/openstack.cnf <<EOF
 [mysqld]
 bind-address = {{ env['CONTROLLER_IP'] }}
@@ -158,8 +150,6 @@ max_connections=4096
 collation-server=utf8_general_ci
 character-set-server=utf8
 performance_schema=off
-validate_password_length=4
-validate_password_policy=LOW
 EOF
 
 # Removing databases by hand
@@ -168,10 +158,8 @@ rm -rf /var/lib/mysql
 mkdir --mode=0755 /var/lib/mysql
 chown mysql:mysql /var/lib/mysql
 
-#systemctl enable mariadb.service
-#systemctl start mariadb.service
-systemctl enable mysqld.service
-systemctl start mysqld.service
+systemctl enable mariadb.service
+systemctl start mariadb.service
 
 # echo "MySQL root password"
 # /usr/bin/mysqladmin -u root -h localhost password 'mysql'
@@ -179,13 +167,7 @@ systemctl start mysqld.service
 # # Not dropping the .my.cnf file in /root
 
 # Note: Root password is empty at first, then set inside openstack_db.sql.
-TMP_PASSWORD=$(grep 'temporary password' /var/log/mysqld.log | tail -1 | sed -e 's/.*root@localhost: \(.*\)/\1/')
-# mysql hash: '*E74858DB86EBA20BC33D0AECAE8A8108C56B17FA'
-mysql -u root -p"${TMP_PASSWORD}" --connect-expired-password -e "ALTER USER 'root'@'localhost'IDENTIFIED WITH mysql_native_password AS '*E74858DB86EBA20BC33D0AECAE8A8108C56B17FA'"
-mysql -u root -pmysql --connect-expired-password -e "uninstall plugin validate_password;"
-mysql -u root -pmysql --connect-expired-password -e "SET PASSWORD = PASSWORD('mysql');"
-
-mysql -u root -pmysql < {{ env['VAULT'] }}/openstack_db.sql
+mysql -u root < {{ env['VAULT'] }}/openstack_db.sql
 
 {% if env['DO_CHEAT'] == 'yes' %}
 echo "MySQL Databases setup (cheat)"
