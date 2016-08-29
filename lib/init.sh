@@ -308,12 +308,14 @@ echo "Cloudinit phone home"
 curl http://${PHONE_HOME}:$PORT/machine/$machine/ready 2>&1 > /dev/null || true
 ENDCLOUDINIT
 
+[ "$machine" == "controller" ] && _SWAP="--swap 2048" 
 
 # Booting a machine
 echo -e "\t* $machine"
 nova boot --flavor $flavor --image ${_IMAGE} --security-groups default,${OS_TENANT_NAME}-sg \
 --nic net-id=${MGMT_NET},v4-fixed-ip=$ip $DN \
 --user-data ${_VM_INIT} \
+${_SWAP} \
 $machine &>/dev/null
 
 } # End boot_machine function

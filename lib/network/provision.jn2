@@ -1,5 +1,23 @@
 # -*-sh-*-
 
+# Block all incoming connections for the moment
+systemctl start iptables
+iptables -I INPUT 1 -m state --state RELATED,ESTABLISHED -j ACCEPT
+iptables -I INPUT 2 -i lo -j ACCEPT
+iptables -I INPUT 3 -j DROP
+
+#iptables -I OUTPUT 1 -o lo -j ACCEPT
+
+# Stopping Services (if existing)
+for service in server linuxbridge-agent dhcp-agent metadata-agent l3-agent; do
+    systemctl stop ${service}.service || true
+done
+
+# Clean the log files
+rm -f /var/log/neutron/*.log
+
+#################################################################
+
 # Configuring iptables
 sed -i "/^-A INPUT -m state --state NEW -s {{ env['MGMT_CIDR']|replace('/','\/') }} -j ACCEPT/ d" /etc/sysconfig/iptables
 sed -i "/^-A INPUT -m state --state NEW -s {{ env['EXT_CIDR']|replace('/','\/') }} -j ACCEPT/ d" /etc/sysconfig/iptables
@@ -59,6 +77,9 @@ PATCH=osext
 MTU=1450
 EOF
 
+{ ip rule del from $CIDR lookup ext
+  ip rule del to $CIDR lookup ext
+} || true
 # Rules
 cat > /etc/sysconfig/network-scripts/rule-veth1 <<EOF
 to $CIDR lookup ext
@@ -97,18 +118,19 @@ chown neutron:neutron /var/lib/neutron/tmp
 ###############################################################
 # MySQL configuration
 systemctl stop mariadb.service
-cat > /etc/my.cnf.d/neutron.cnf <<EOF
+cat > /etc/my.cnf.d/openstack.cnf <<EOF
 [mysqld]
 bind-address = {{ env['NEUTRON_IP'] }}
-default-storage-engine = innodb
+default-storage-engine=innodb
 innodb_file_per_table
-max_connections = 4096
-collation-server = utf8_general_ci
-character-set-server = utf8
-performance_schema = off
+max_connections=4096
+collation-server=utf8_general_ci
+character-set-server=utf8
+performance_schema=off
 EOF
 
 # Removing databases by hand
+# Or check that: http://hakunin.com/six-ansible-practices#path-to-success-3
 rm -rf /var/lib/mysql
 mkdir --mode=0755 /var/lib/mysql
 chown mysql:mysql /var/lib/mysql
@@ -116,7 +138,11 @@ chown mysql:mysql /var/lib/mysql
 systemctl enable mariadb.service
 systemctl start mariadb.service
 
-# MySQL Databases initial setup
+# echo "MySQL root password"
+# /usr/bin/mysqladmin -u root -h localhost password 'mysql'
+# /usr/bin/mysqladmin -u root -h openstack-controller password 'mysql'
+# # Not dropping the .my.cnf file in /root
+
 # Note: Root password is empty at first, then set inside openstack_db.sql.
 mysql -u root < {{ env['VAULT'] }}/openstack_db.sql
 
@@ -126,15 +152,10 @@ mysql -u root -pmysql < {{ env['VAULT'] }}/openstack_db_dump.sql
 # Populate the database
 #su -s /bin/sh -c "neutron-db-manage --config-file /etc/neutron/neutron.conf --config-file /etc/neutron/plugin.ini upgrade head" neutron
 su -s /bin/sh -c "neutron-db-manage --config-file /etc/neutron/neutron.conf --config-file /etc/neutron/plugins/ml2/ml2_conf.ini upgrade head" neutron
-#mysqldump -u root -pmysql --all-databases --opt > /home/centos/db_dump.sql
+mysqldump -u root -pmysql --all-databases --opt > /home/centos/db_dump.sql
 {% endif %}
 
 ###############################################################
-# Cleaning the logs
-rm -f /var/log/neutron/*
-# rm -f /var/log/neutron/{dhcp-agent,l3-agent,metadata-agent,linuxbridge-agent}.log
-# rm -f /var/log/neutron/neutron-ns-metadata-proxy-*
-# #rm -rf /var/lib/neutron/dhcp/*
 
 DATA_IP=$(ip -4 a s dev eth1 | awk '/inet/ { a = $2; b = gensub(/(.+)\/24/, "\\1", "g", a); print b}')
 [ -z "$DATA_IP" ] && exit 1

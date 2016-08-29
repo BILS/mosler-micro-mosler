@@ -6,7 +6,10 @@ DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.
 -- UPDATE mysql.user SET Password='' WHERE User='root';
 -- UPDATE mysql.user SET Password=PASSWORD('mysql') WHERE User='root';
 
--- CREATE USER 'root'@'controller' IDENTIFIED BY 'mysql';
+-- SET PASSWORD FOR 'root'@'localhost' = PASSWORD('mysql');
+-- ALTER USER 'root' IDENTIFIED BY 'mysql';
+
+-- CREATE USER 'root'@'neutron' IDENTIFIED BY 'mysql';
 
 GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' IDENTIFIED by 'mysql' WITH GRANT OPTION;
 GRANT ALL PRIVILEGES ON *.* TO 'root'@'neutron' IDENTIFIED by 'mysql' WITH GRANT OPTION;
