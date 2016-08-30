@@ -164,9 +164,10 @@ MGMT_NET=$(neutron net-list --tenant_id=${TENANT_ID} | awk "/ ${OS_TENANT_NAME}-
 DATA_NET=$(neutron net-list --tenant_id=${TENANT_ID} | awk "/ ${OS_TENANT_NAME}-data-net /{print \$2}")
 DATA_SUBNET=$(neutron subnet-list --tenant_id=${TENANT_ID} | awk "/ ${OS_TENANT_NAME}-data-subnet /{print \$2}")
 
-echo "Management Net: $MGMT_NET"
-echo "Data Net: $DATA_NET"
-echo "Data SubNet: $DATA_SUBNET"
+# echo "Management Net: $MGMT_NET"
+# echo "Data Net: $DATA_NET"
+# echo "Data SubNet: $DATA_SUBNET"
+echo "Checking network information"
 
 if [ -z "$MGMT_NET" ] || [ -z "$DATA_NET" ] || [ -z "$DATA_SUBNET" ]; then
     echo "Error: Could not find the Management or Data network" > ${ORG_FD1}
@@ -182,6 +183,7 @@ fuser -k ${PORT}/tcp || true
 trap "fuser -k ${PORT}/tcp &>/dev/null || true; exit 1" SIGINT SIGTERM EXIT
 python ${MM_HOME}/lib/boot_progress.py $PORT "${MACHINES[@]}" 2>&1 &
 REST_PID=$!
+sleep 2
 
 function boot_machine {
     local machine=$1
@@ -308,7 +310,7 @@ echo "Cloudinit phone home"
 curl http://${PHONE_HOME}:$PORT/machine/$machine/ready 2>&1 > /dev/null || true
 ENDCLOUDINIT
 
-[ "$machine" == "controller" ] && _SWAP="--swap 2048" 
+#[ "$machine" == "controller" ] && _SWAP="--swap 2048" 
 
 # Booting a machine
 echo -e "\t* $machine"

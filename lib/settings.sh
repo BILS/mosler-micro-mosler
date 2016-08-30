@@ -57,7 +57,7 @@ export MACHINES=('supernode' 'controller' 'neutron' 'compute1' 'compute2' 'compu
 declare -A FLAVORS
 export FLAVORS=(\
     [supernode]=m1.small \
-    [controller]=m1.small \
+    [controller]=m1.medium \
     [neutron]=m1.small \
     [compute1]=m1.large \
     [compute2]=m1.large \
