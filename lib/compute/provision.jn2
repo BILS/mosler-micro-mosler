@@ -24,12 +24,10 @@ chown neutron:neutron /var/lib/neutron/tmp
 
 DATA_IP=$(ip -4 a s dev eth1 | awk '/inet/ { a = $2; b = gensub(/(.+)\/24/, "\\1", "g", a); print b}')
 [ -z "$DATA_IP" ] && exit 1
-
 openstack-config --set /etc/neutron/plugins/ml2/linuxbridge_agent.ini vxlan local_ip $DATA_IP
 
 MGMT_IP=$(ip -4 a s dev eth0 | awk '/inet/ { a = $2; b = gensub(/(.+)\/[1-9][0-9]/, "\\1", "g", a); print b}')
 [ -z "$MGMT_IP" ] && exit 1
-
 openstack-config --set /etc/nova/nova.conf DEFAULT my_ip $MGMT_IP
 
 rm -rf /var/lib/nova/tmp
@@ -38,9 +36,9 @@ chown -R nova:nova /var/lib/nova/tmp
 
 # Finally
 systemctl restart libvirtd.service
-systemctl restart openstack-nova-compute.service
 systemctl restart neutron-linuxbridge-agent.service
+systemctl restart openstack-nova-compute.service
 
 systemctl enable libvirtd.service
-systemctl enable openstack-nova-compute.service
 systemctl enable neutron-linuxbridge-agent.service
+systemctl enable openstack-nova-compute.service

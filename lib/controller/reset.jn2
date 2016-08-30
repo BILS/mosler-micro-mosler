@@ -59,7 +59,18 @@ systemctl disable rabbitmq-server
 
 
 #############################################################
+sed -i "/^-A INPUT -m state --state NEW -s {{ env['MGMT_CIDR']|replace('/','\/') }} -j ACCEPT/ d" /etc/sysconfig/iptables
+sed -i "/^-A INPUT -m state --state NEW -s {{ env['EXT_CIDR']|replace('/','\/') }} -j ACCEPT/ d" /etc/sysconfig/iptables
 systemctl restart iptables
+
+
+#############################################################
+sed -i "/ {{ env['EXT_CIDR']|replace('/','\/') }} / d" /etc/sysconfig/network-scripts/route-eth0
+sed -i "/ {{ env['EXT_CIDR']|replace('/','\/') }} / d" /etc/sysconfig/network-scripts/rule-eth0
+
+{ ip rule del to {{ env['EXT_CIDR'] }} lookup ext
+  ip rule del from {{ env['EXT_CIDR'] }} lookup ext
+} || true
 systemctl restart network
 
 #############################################################
@@ -67,19 +78,18 @@ systemctl restart network
 systemctl disable memcached
 systemctl stop memcached
 
-#############################################################
-# SSL certificate for Nginx (no password)
-CERT=/etc/nginx/cert
-rm -f ${CERT}.key
-rm -f ${CERT}.pem
-
-systemctl disable nginx
-systemctl stop nginx
+# #############################################################
+# # SSL certificate for Nginx (no password)
+# CERT=/etc/nginx/cert
+# rm -f ${CERT}.key
+# rm -f ${CERT}.pem
+# systemctl disable nginx
+# systemctl stop nginx
 
 #############################################################
 # MySQL
-systemctl disable mysql
-systemctl stop mysql
+systemctl disable mariadb
+systemctl stop mariadb
 
 rm -rf /var/lib/mysql
 mkdir --mode=0755 /var/lib/mysql

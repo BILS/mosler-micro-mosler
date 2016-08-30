@@ -1,5 +1,24 @@
 # -*-sh-*-
 
-# iptables
+systemctl stop libvirtd.service
+systemctl stop openstack-nova-compute.service
+systemctl stop neutron-linuxbridge-agent.service
+
+systemctl disable libvirtd.service
+systemctl disable openstack-nova-compute.service
+systemctl disable neutron-linuxbridge-agent.service
+
+#############################################################
+
 sed -i "/^-A INPUT -m state --state NEW -s {{ env['MGMT_CIDR']|replace('/','\/') }} -j ACCEPT/ d" /etc/sysconfig/iptables
-service iptables restart
+systemctl restart iptables
+
+#############################################################
+
+sed -i '/server controller iburst/ d' /etc/chrony.conf
+systemctl restart chronyd.service
+
+#############################################################
+
+rm -rf /var/lib/neutron/tmp
+rm -rf /var/lib/nova/tmp

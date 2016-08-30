@@ -61,5 +61,3 @@ openstack role add --project demo    --user demo    user
 unset OS_TOKEN
 unset OS_URL
 unset OS_IDENTITY_API_VERSION
-
-#mysqldump -u root -pmysql --all-databases --opt > /home/centos/db_dump.sql

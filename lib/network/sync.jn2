@@ -9,7 +9,9 @@ yum -y install centos-release-openstack-mitaka
 
 yum -y upgrade
 
-yum -y install nc nmap tcpdump chrony iptables-services yum -y install mariadb mariadb-server python2-PyMySQL rabbitmq-server memcached python-memcached
+yum -y install nc nmap tcpdump chrony iptables-services yum -y install mariadb mariadb-server python2-PyMySQL memcached python-memcached
+
+#yum -y install rabbitmq-server
 
 yum -y install openstack-utils python-neutronclient openstack-neutron openstack-neutron-ml2 openstack-neutron-linuxbridge ebtables ipset
 
@@ -32,7 +34,7 @@ declare -A FILES=(\
 ['metadata_agent.ini']='/etc/neutron/metadata_agent.ini' \
 ['dhcp_agent.ini']='/etc/neutron/dhcp_agent.ini' \
 )
-#['dnsmasq-neutron.conf']='/etc/neutron/dnsmasq-neutron.conf'
+#['dnsmasq-neutron.conf']='/etc/neutron/dnsmasq-neutron.conf' \
 for f in ${!FILES[@]}
 do
     rsync -a --no-perms {{ env['VAULT'] }}/$f ${FILES[$f]}

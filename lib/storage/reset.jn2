@@ -11,3 +11,10 @@ exportfs -ra
 # systemctl disable nfs-server
 # systemctl disable nfs-lock
 # systemctl disable nfs-idmap
+
+sed -i '/server controller iburst/ d' /etc/chrony.conf
+systemctl stop chronyd.service
+systemctl disable chronyd.service
+
+systemctl stop    rpcbind nfs-server
+systemctl disable rpcbind nfs-server

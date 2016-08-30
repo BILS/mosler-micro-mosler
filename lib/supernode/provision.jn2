@@ -35,6 +35,7 @@ EOF
 fi
 
 
+##############################################################
 # For for glance
 wait_port controller 9292 300
 
@@ -44,5 +45,23 @@ openstack image list | awk "/cirros/ {print \$2}" | while read i; do openstack i
 
 openstack image create "cirros" --file /home/centos/{{ env['VAULT'] }}/cirros.img --disk-format qcow2 --container-format bare --public
 
-# wait_port controller 5000 300
-# TEST.sh
+##############################################################
+wait_port neutron 9696 300
+source /root/admin.rc
+
+echo "Removing any 'public-net'"
+neutron net-list -F id -F name | awk '/ public-net / {print $2}' | while read netid; do neutron net-delete ${netid}; done
+
+echo 'Creating public network in neutron & updating the mosler-heat parameters'
+extnet=$(neutron net-create --shared --provider:physical_network provider --provider:network_type flat public-net | awk '/ id / {print $4}')
+
+echo "Creating public subnet network in neutron"
+CIDR={{ env['EXT_CIDR'] }}
+IPPREFIX=${CIDR%.0/24}
+neutron subnet-create --name public-subnet --allocation-pool start=${IPPREFIX}.30,end=${IPPREFIX}.200 --disable-dhcp  --gateway ${IPPREFIX}.1 public-net ${CIDR}
+
+##############################################################
+wait_port controller 5000 300
+wait_port controller 9292 360
+wait_port controller 8774 300
+{{ env['VAULT'] }}/TEST.sh

@@ -3,24 +3,7 @@
 # iptables
 sed -i "/^-A INPUT -m state --state NEW -s {{ env['MGMT_CIDR']|replace('/','\/') }} -j ACCEPT/ d" /etc/sysconfig/iptables
 sed -i "/^-A INPUT -m state --state NEW -s {{ env['EXT_CIDR']|replace('/','\/') }} -j ACCEPT/ d" /etc/sysconfig/iptables
-service iptables stop || true
-service iptables start
-
-for f in ifcfg route rule
-do
-    rm -f /etc/sysconfig/network-scripts/${f}-veth1
-done
-
-ip rule del from {{ env['MGMT_CIDR'] }} lookup mgmt || true
-ip rule del to {{ env['MGMT_CIDR'] }} lookup mgmt || true
-
-ip rule del from {{ env['DATA_CIDR'] }} lookup data || true
-ip rule del to {{ env['DATA_CIDR'] }} lookup data || true
-
-ip rule del from {{ env['EXT_CIDR'] }} lookup ext || true
-ip rule del to {{ env['EXT_CIDR'] }} lookup ext || true
-
-systemctl restart network
+systemctl restart iptables
 
 # Starting Neutron services
 for service in server dhcp-agent l3-agent linuxbridge-agent metadata-agent; do
@@ -36,6 +19,15 @@ rm -f /var/log/neutron/*.log
 # rm -f /var/log/neutron/neutron-ns-metadata-proxy-*
 # rm -rf /var/lib/neutron/dhcp/*
 
+#############################################################
+systemctl stop mariadb.service
+rm -rf /var/lib/mysql
+mkdir --mode=0755 /var/lib/mysql
+chown mysql:mysql /var/lib/mysql
+rm -f /etc/my.cnf.d/openstack.cnf
+systemctl disable mariadb.service
+
+#############################################################
 # Cleaning old namespaces
 pkill dnsmasq || true
 ps ax | awk '/neutron-ns-metadata-proxy/ {print $1}' | while read pid; do
@@ -44,3 +36,23 @@ done
 
 sleep 5
 ip netns | while read ns; do ip netns del $ns; done
+
+#############################################################
+# Removing the openstack interface
+if [ -e /etc/sysconfig/network-scripts/ifcfg-veth1 ]; then
+    ifdown veth1
+    for f in ifcfg route rule; do rm -f /etc/sysconfig/network-scripts/${f}-veth1; done
+
+    {
+	ip rule del from {{ env['MGMT_CIDR'] }} lookup mgmt
+	ip rule del to {{ env['MGMT_CIDR'] }} lookup mgmt
+	
+	ip rule del from {{ env['DATA_CIDR'] }} lookup data
+	ip rule del to {{ env['DATA_CIDR'] }} lookup data
+	
+	ip rule del from {{ env['EXT_CIDR'] }} lookup ext
+	ip rule del to {{ env['EXT_CIDR'] }} lookup ext
+    } || true
+    
+    systemctl restart network
+fi

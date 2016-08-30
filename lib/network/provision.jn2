@@ -96,17 +96,6 @@ EOF
 systemctl restart network
 
 ###############################################################
-# Starting the Message Broker
-systemctl enable rabbitmq-server.service
-
-systemctl stop rabbitmq-server.service
-[ -f /var/log/rabbitmq/rabbit@neutron.log ] && rm -f /var/log/rabbitmq/rabbit@neutron.log
-systemctl start rabbitmq-server.service
-
-# Preparing the RabbitMQ user
-rabbitmqctl add_user openstack rabbit || true
-rabbitmqctl set_permissions openstack ".*" ".*" ".*"
-
 # Memcached service
 systemctl enable memcached.service
 systemctl restart memcached.service

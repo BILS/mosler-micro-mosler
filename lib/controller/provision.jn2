@@ -9,15 +9,10 @@ iptables -I INPUT 3 -j DROP
 #iptables -I OUTPUT 1 -o lo -j ACCEPT
 
 # Stopping Services (if existing)
-{% set items = [ 'openstack-nova-api',
-		 'openstack-nova-scheduler',
-		 'openstack-nova-conductor',
-		 'openstack-glance-api',
-		 'openstack-glance-registry'
-] -%}
-{% for service in items %}
-systemctl stop {{ service }}.service || true
-{% endfor %}
+for service in nova-{api,scheduler,conductor} glance-{api,registry}
+do
+    systemctl stop openstack-${service}.service
+done || true
 
 # Clean the log files
 rm -f /var/log/nova/*.log
@@ -176,6 +171,7 @@ echo "MySQL Databases setup (cheat)"
 mysql -u root -pmysql < {{ env['VAULT'] }}/openstack_db_dump.sql
 {% else %}
 {% include 'controller/provision-nocheat.jn2' %}
+mysqldump -u root -pmysql --all-databases --opt > /home/centos/db_dump.sql
 {% endif %}
 
 #############################################################
@@ -184,18 +180,18 @@ mysql -u root -pmysql < {{ env['VAULT'] }}/openstack_db_dump.sql
 echo '@hourly /usr/bin/keystone-manage token_flush >/var/log/keystone/keystone-tokenflush.log 2>&1' >> /var/spool/cron/keystone
 
 #############################################################
+# Adjusting
+openstack-config --set /etc/nova/nova.conf DEFAULT my_ip {{ env['CONTROLLER_IP'] }}
+
+
+#############################################################
 # Starting Openstack Services
-{% set items = [ 'openstack-glance-api',
-		 'openstack-glance-registry',
-		 'openstack-nova-api',
-		 'openstack-nova-scheduler',
-		 'openstack-nova-conductor',
-] -%}
-{% for service in items %}
-systemctl restart {{ service }}.service
-systemctl enable {{ service }}.service
-{% endfor %}
-{# 'openstack-nova-consoleauth', 'openstack-nova-novncproxy' #}
+for service in glance-{api,registry} nova-{api,scheduler,conductor}
+do
+    systemctl start openstack-${service}.service
+    systemctl enable openstack-${service}.service
+done
+{# 'nova-consoleauth', 'nova-novncproxy' #}
 
 
 #############################################################
@@ -210,3 +206,21 @@ nova flavor-create mosler.8cores  auto 500 10 1
 nova flavor-create mosler.16cores auto 500 10 1
 # Adding availability zone and aggregate
 nova aggregate-create service-and-login serv-login
+
+function wait_for_compute1 {
+    local -i t=${1:-30} # default: 30 seconds
+    local -i backoff=1
+    local -i stride=20
+    while (( t > 0 )) ; do
+	echo "Time left: $t"
+	if nova host-list | grep -q compute1.novalocal; then return 0; fi
+	(( t-=backoff ))
+	sleep $backoff
+        if (( (t % stride) == 0 )); then (( backoff*=2 )); fi
+    done
+    exit 1
+}
+wait_for_compute1 300
+
+nova aggregate-add-host service-and-login compute1.novalocal
+
