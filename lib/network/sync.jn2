@@ -33,8 +33,9 @@ declare -A FILES=(\
 ['l3_agent.ini']='/etc/neutron/l3_agent.ini' \
 ['metadata_agent.ini']='/etc/neutron/metadata_agent.ini' \
 ['dhcp_agent.ini']='/etc/neutron/dhcp_agent.ini' \
+['dnsmasq-neutron.conf']='/etc/neutron/dnsmasq-neutron.conf' \
 )
-#['dnsmasq-neutron.conf']='/etc/neutron/dnsmasq-neutron.conf' \
+
 for f in ${!FILES[@]}
 do
     rsync -a --no-perms {{ env['VAULT'] }}/$f ${FILES[$f]}

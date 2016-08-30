@@ -13,6 +13,9 @@ for service in server dhcp-agent l3-agent linuxbridge-agent metadata-agent; do
     fi
 done
 
+systemctl start neutron-linuxbridge-cleanup.service
+systemctl stop neutron-linuxbridge-cleanup.service
+
 # Cleaning the logs
 rm -f /var/log/neutron/*.log
 # rm -f /var/log/neutron/{dhcp-agent,l3-agent,metadata-agent,openvswitch-agent}.log

@@ -20,12 +20,16 @@ rm -f /var/log/neutron/*.log
 
 # Configuring iptables
 sed -i "/^-A INPUT -m state --state NEW -s {{ env['MGMT_CIDR']|replace('/','\/') }} -j ACCEPT/ d" /etc/sysconfig/iptables
+sed -i "/^-A INPUT -m state --state NEW -s {{ env['DATA_CIDR']|replace('/','\/') }} -j ACCEPT/ d" /etc/sysconfig/iptables
 sed -i "/^-A INPUT -m state --state NEW -s {{ env['EXT_CIDR']|replace('/','\/') }} -j ACCEPT/ d" /etc/sysconfig/iptables
 # Insert it before the other line
 sed -i "/^-A INPUT -p tcp -m state --state NEW -m tcp --dport 22 -j ACCEPT/ i \
 -A INPUT -m state --state NEW -s {{ env['MGMT_CIDR']|replace('/','\/') }} -j ACCEPT" /etc/sysconfig/iptables
 sed -i "/^-A INPUT -p tcp -m state --state NEW -m tcp --dport 22 -j ACCEPT/ i \
+-A INPUT -m state --state NEW -s {{ env['DATA_CIDR']|replace('/','\/') }} -j ACCEPT" /etc/sysconfig/iptables
+sed -i "/^-A INPUT -p tcp -m state --state NEW -m tcp --dport 22 -j ACCEPT/ i \
 -A INPUT -m state --state NEW -s {{ env['EXT_CIDR']|replace('/','\/') }} -j ACCEPT" /etc/sysconfig/iptables
+
 service iptables restart
 
 # System config

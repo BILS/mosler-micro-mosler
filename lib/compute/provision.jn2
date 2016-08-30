@@ -6,6 +6,12 @@ sed -i "/^-A INPUT -m state --state NEW -s {{ env['MGMT_CIDR']|replace('/','\/')
 # Insert it before the other line
 sed -i "/^-A INPUT -p tcp -m state --state NEW -m tcp --dport 22 -j ACCEPT/ i \
 -A INPUT -m state --state NEW -s {{ env['MGMT_CIDR']|replace('/','\/') }} -j ACCEPT" /etc/sysconfig/iptables
+
+sed -i "/^-A INPUT -m state --state NEW -s {{ env['DATA_CIDR']|replace('/','\/') }} -j ACCEPT/ d" /etc/sysconfig/iptables
+# Insert it before the other line
+sed -i "/^-A INPUT -p tcp -m state --state NEW -m tcp --dport 22 -j ACCEPT/ i \
+-A INPUT -m state --state NEW -s {{ env['DATA_CIDR']|replace('/','\/') }} -j ACCEPT" /etc/sysconfig/iptables
+
 systemctl restart iptables
 
 #############################################################
@@ -33,6 +39,9 @@ openstack-config --set /etc/nova/nova.conf DEFAULT my_ip $MGMT_IP
 rm -rf /var/lib/nova/tmp
 mkdir -p /var/lib/nova/tmp
 chown -R nova:nova /var/lib/nova/tmp
+
+# Deleting old VMs
+virsh list --all | awk '{ if ($0 !~ " Id " && $0 !~ "^-----" && $0 != "") print $1" "$2}' | while read domain name; do virsh destroy $domain || virsh undefine $name; done
 
 # Finally
 systemctl restart libvirtd.service

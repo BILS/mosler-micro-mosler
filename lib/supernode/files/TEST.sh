@@ -5,7 +5,7 @@ source /root/demo.rc
 
 neutron net-create ${OS_PROJECT_NAME}-net
 neutron router-create ${OS_PROJECT_NAME}-router
-#neutron gateway-set ${OS_PROJECT_NAME}-router public-net
+neutron router-gateway-set ${OS_PROJECT_NAME}-router public-net
 neutron subnet-create --name ${OS_PROJECT_NAME}-subnet --gateway 192.168.10.1 --enable-dhcp ${OS_PROJECT_NAME}-net 192.168.10.0/24
 neutron router-interface-add ${OS_PROJECT_NAME}-router ${OS_PROJECT_NAME}-subnet
 
@@ -39,6 +39,6 @@ nova boot --flavor mosler.1core --image cirros \
 ${OS_PROJECT_NAME}-compute-node
 
 
-FIP=$(openstack ip floating create public-net | awk '/ ip /{print $4}')
-sleep 10
-openstack ip floating add $FIP ${OS_PROJECT_NAME}-login-node 
+# FIP=$(openstack ip floating create public-net | awk '/ ip /{print $4}')
+# sleep 10
+# openstack ip floating add $FIP ${OS_PROJECT_NAME}-login-node 

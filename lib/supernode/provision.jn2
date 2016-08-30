@@ -53,7 +53,7 @@ echo "Removing any 'public-net'"
 neutron net-list -F id -F name | awk '/ public-net / {print $2}' | while read netid; do neutron net-delete ${netid}; done
 
 echo 'Creating public network in neutron & updating the mosler-heat parameters'
-extnet=$(neutron net-create --shared --provider:physical_network provider --provider:network_type flat public-net | awk '/ id / {print $4}')
+extnet=$(neutron net-create --shared --provider:physical_network provider --provider:network_type flat --router:external public-net | awk '/ id / {print $4}')
 
 echo "Creating public subnet network in neutron"
 CIDR={{ env['EXT_CIDR'] }}
@@ -62,6 +62,6 @@ neutron subnet-create --name public-subnet --allocation-pool start=${IPPREFIX}.3
 
 ##############################################################
 wait_port controller 5000 300
-wait_port controller 9292 360
+wait_port controller 9292 420
 wait_port controller 8774 300
 {{ env['VAULT'] }}/TEST.sh
