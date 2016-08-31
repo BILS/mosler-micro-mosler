@@ -1,12 +1,19 @@
 # µ-Mosler setup on Knox
 
 This set of scripts allows you to create a test environment in an
-Openstack cluster.  This created set of virtual machines will be the
-base for testing the connection to the
-[ePouta cloud](https://research.csc.fi/epouta). We will then use that
-set of VMs to (re)create
+Openstack cluster, called Knox. Knox uses the
+[Liberty version of Openstack](http://docs.openstack.org/liberty/install-guide-ubuntu/).
+
+The created set of virtual machines on Knox contains itself an
+openstack installation (the
+[mitaka version][http://docs.openstack.org/mitaka/install-guide-rdo/]),
+often called the over-cloud (with respect to Knox being the
+under-cloud). The over-cloud boots VMs that are the base for testing
+the connection to the [ePouta cloud](https://research.csc.fi/epouta).
+
+We will then use the over-cloud to implement
 [Mosler](https://bils.se/resources/mosler.html) and further improve or
-extend it (codenamed µ-Mosler). Our openstack cluster is called Knox.
+extend it (codenamed µ-Mosler).
 
 ## Requirements
 You first need to create a file (named 'user.rc') in order to set up
