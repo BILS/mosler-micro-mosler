@@ -35,7 +35,7 @@ The scripts assume that
 * The Thinlinc packages are available in `$TL_HOME`
 
 ## Execution
-You can run `micromosler init --all` in order to create the necessary routers,
+You can run `micromosler init --net` in order to create the necessary routers,
 networks and security groups, prior to creating the virtual machines.
 It will start the VMs with proper IP information. In subsequent runs,
 `micromosler init` will only create the VMs.
@@ -49,7 +49,7 @@ configures the servers. The task should be idempotent.
 Run `micromosler reset` if you want to erase for the provisioning
 phase did.
 
-The `micromosler clean` script can be run with the --all flag, to
+The `micromosler clean` script can be run with the --net flag, to
 destroy routers, networks, security groups and floating IPs.
 Otherwise, it only deletes the running VMs.
 
@@ -67,7 +67,7 @@ You can append the `-h` flag to see the command options.
 	# The openstack user 'fred' must maybe be an admin on the tenant 'mmosler1'
 	#
 	#...and cue music!
-	./micromosler.sh init --all # You'll be prompted at the end for a reboot.
+	./micromosler.sh init --net # You'll be prompted at the end for a reboot.
 	                            # Rebooting will help the partition to correctly resize to the disk size
 	./micromosler.sh sync       # Wait a bit, servers are probably not done rebooting
 	./micromosler.sh provision 
