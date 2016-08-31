@@ -6,7 +6,7 @@ Openstack cluster, called Knox. Knox uses the
 
 The created set of virtual machines on Knox contains itself an
 openstack installation (the
-[mitaka version][http://docs.openstack.org/mitaka/install-guide-rdo/]),
+[mitaka version](http://docs.openstack.org/mitaka/install-guide-rdo/)),
 often called the over-cloud (with respect to Knox being the
 under-cloud). The over-cloud boots VMs that are the base for testing
 the connection to the [ePouta cloud](https://research.csc.fi/epouta).
